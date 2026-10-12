@@ -739,3 +739,7 @@ a.beneficio:hover h3 { color: var(--rosa-forte); }
 .titulo-pagina { padding-block: clamp(1.6rem, 4vw, 3rem) clamp(1.4rem, 3vw, 2.4rem); }
 .titulo-pagina h1 { font-size: clamp(2.1rem, 5.2vw, 3.6rem); margin-bottom: .6rem; }
 .titulo-pagina p { max-width: 56ch; }
+
+@media(min-width:769px){.ed-bloco{height:520px;min-height:0}.ed-bloco>div:first-child{height:520px;overflow:hidden}.ed-bloco>div:first-child img{width:100%;height:100%;object-fit:cover;object-position:center 40%}.ed-bloco>div:last-child{height:520px;min-height:0}}@media(max-width:768px){.ed-bloco{height:auto}.ed-bloco>div:first-child{height:340px;overflow:hidden}.ed-bloco>div:first-child img{width:100%;height:100%;object-fit:cover}.ed-bloco>div:last-child{height:auto}}
+.ed-bloco > div:first-child img{object-position:center 10% !important;}
+/* PRETA CHIK - Identidade dourada */ :root{--rosa:#B99145;--pink:#B99145;--cor-rosa:#B99145;}

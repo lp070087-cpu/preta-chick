@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Entrar — La Belle Modas</title>
-<meta name="description" content="Entre na sua conta La Belle Modas para acompanhar seus pedidos e suas informações.">
+<title>Entrar — Preta Chik Moda Praia</title>
+<meta name="description" content="Entre na sua conta Preta Chik Moda Praia para acompanhar seus pedidos e suas informações.">
 <meta name="theme-color" content="#0f1116">
-<link rel="icon" href="assets/img/logo/labelle-avatar-sm.webp">
-<link rel="apple-touch-icon" href="assets/img/logo/labelle-avatar.webp">
+<link rel="icon" href="assets/img/logo/preta-chik.jpg">
+<link rel="apple-touch-icon" href="assets/img/logo/preta-chik.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Jost:wght@200;300;400;500&display=swap">
@@ -15,6 +15,18 @@
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/paginas.css">
 <link rel="stylesheet" href="assets/css/conta.css">
+
+<!-- Anti-piscada, e SÓ isso. Quem chega em login.html já conectada é levada
+     para conta.html por conta-sessao.js. Enquanto a resposta do servidor não
+     chega, o formulário fica escondido para não piscar por um instante.
+     A classe sai em QUALQUER desfecho — sessão confirmada, 401 ou falha do
+     servidor — e aí o formulário aparece normalmente. Sem JavaScript, a
+     classe nunca é aplicada e o formulário aparece como sempre apareceu.
+     Isto NÃO é proteção: é só para a tela não piscar.                    -->
+<style id="estado-inicial">
+  html.sessao-conferindo .entrar--pagina { visibility: hidden; }
+</style>
+<script>document.documentElement.className += " sessao-conferindo";</script>
 </head>
 <body>
 
@@ -29,9 +41,9 @@
 
     <div class="entrar entrar--pagina pagina-acesso">
       <figure class="entrar__foto">
-        <img src="assets/img/hero/hero-b.webp" alt="Modelo vestindo uma peça da La Belle Modas" width="1200" height="1500">
+        <img src="assets/img/hero/preta-chik-login.jpg" alt="Modelo vestindo uma peça da Preta Chik Moda Praia" width="1200" height="1500">
         <figcaption>
-          <b>Bem-vinda à La Belle</b>
+          <b>Bem-vinda à Preta Chik</b>
           <p>Acompanhe seus pedidos, guarde seus endereços e fale direto com a loja.</p>
         </figcaption>
       </figure>
@@ -40,8 +52,8 @@
         <div class="entrar__caixa">
 
           <div class="cx-marca">
-            <img src="assets/img/logo/labelle-avatar.webp" alt="" width="46" height="46">
-            <b>La <i>Belle</i></b>
+            <img src="assets/img/logo/preta-chik.jpg" alt="" width="46" height="46">
+            <b>Preta <i>Chik</i></b>
           </div>
 
           <div class="entrar__abas">
@@ -78,7 +90,7 @@
             <div class="cx-recuperar oculto" id="recuperar">
               <p>A redefinição de senha por e-mail ainda não está ligada — <b>pendente de
               integração de e-mail</b>. Por enquanto, fale com a loja pelo WhatsApp informando
-              o e-mail da sua conta e a La Belle libera um novo acesso para você.</p>
+              o e-mail da sua conta e a Preta Chik libera um novo acesso para você.</p>
             </div>
 
             <button class="bt bt--rosa bt--largo" type="submit">Entrar</button>
@@ -108,9 +120,24 @@
 <script src="assets/js/conta-ui.js"></script>
 <script src="assets/js/conta-mock.js"></script>
 <script src="assets/js/conta-api.js"></script>
+<script src="assets/js/conta-sessao.js"></script>
 <script>
 (function () {
   "use strict";
+
+  /* PRIMEIRA COISA: o servidor decide se esta tela deve existir.
+     Sessao viva -> vai direto para a area da cliente, sem pedir senha.
+     Sem sessao (401) ou servidor fora do ar -> o formulario aparece.
+     Nada e apagado no caminho: um servidor que tropeca nao derruba a
+     sessao de ninguem. */
+  if (window.CONTA_SESSAO) {
+    CONTA_SESSAO.conferir();
+  } else {
+    /* Rede de seguranca: sem o portao, a classe anti-piscada ficaria presa
+       e o formulario nunca apareceria. Melhor mostrar a tela como ela
+       sempre foi do que deixar a pagina em branco. */
+    document.documentElement.classList.remove("sessao-conferindo");
+  }
 
   LB.iniciar({ pagina: "login" });
   CONTA_UI.pintarIcones();

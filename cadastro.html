@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Criar conta — La Belle Modas</title>
-<meta name="description" content="Crie a sua conta La Belle Modas para acompanhar pedidos, salvar endereços e falar direto com a loja.">
+<title>Criar conta — Preta Chik Moda Praia</title>
+<meta name="description" content="Crie a sua conta Preta Chik Moda Praia para acompanhar pedidos, salvar endereços e falar direto com a loja.">
 <meta name="theme-color" content="#0f1116">
-<link rel="icon" href="assets/img/logo/labelle-avatar-sm.webp">
-<link rel="apple-touch-icon" href="assets/img/logo/labelle-avatar.webp">
+<link rel="icon" href="assets/img/logo/preta-chik.jpg">
+<link rel="apple-touch-icon" href="assets/img/logo/preta-chik.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Jost:wght@200;300;400;500&display=swap">
@@ -15,6 +15,15 @@
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/paginas.css">
 <link rel="stylesheet" href="assets/css/conta.css">
+
+<!-- Anti-piscada, e SÓ isso. Quem já está conectada e abre cadastro.html é
+     levada para conta.html: não faz sentido oferecer "criar conta" a quem já
+     tem sessão. Enquanto o servidor não responde, o formulário fica escondido
+     para não piscar. A classe sai em qualquer desfecho. Isto NÃO é proteção. -->
+<style id="estado-inicial">
+  html.sessao-conferindo .entrar--pagina { visibility: hidden; }
+</style>
+<script>document.documentElement.className += " sessao-conferindo";</script>
 </head>
 <body>
 
@@ -29,9 +38,9 @@
 
     <div class="entrar entrar--pagina pagina-acesso">
       <figure class="entrar__foto">
-        <img src="assets/img/hero/hero-c.webp" alt="Modelo vestindo uma peça da La Belle Modas" width="1200" height="1500">
+        <img src="assets/img/hero/preta-chik-hero-c.jpg" alt="Modelo vestindo uma peça da Preta Chik Moda Praia" width="1200" height="1500">
         <figcaption>
-          <b>Uma conta La Belle</b>
+          <b>Uma conta Preta Chik</b>
           <p>Seus pedidos, seus endereços e suas medidas de sempre, guardados num só lugar.</p>
         </figcaption>
       </figure>
@@ -40,8 +49,8 @@
         <div class="entrar__caixa">
 
           <div class="cx-marca">
-            <img src="assets/img/logo/labelle-avatar.webp" alt="" width="46" height="46">
-            <b>La <i>Belle</i></b>
+            <img src="assets/img/logo/preta-chik.jpg" alt="" width="46" height="46">
+            <b>Preta <i>Chik</i></b>
           </div>
 
           <div class="entrar__abas">
@@ -135,9 +144,21 @@
 <script src="assets/js/conta-ui.js"></script>
 <script src="assets/js/conta-mock.js"></script>
 <script src="assets/js/conta-api.js"></script>
+<script src="assets/js/conta-sessao.js"></script>
 <script>
 (function () {
   "use strict";
+
+  /* Sessao viva + cadastro.html aberto = pessoa que ja tem conta. Vai para a
+     area da cliente em vez de ver o fluxo de criar outra conta por engano.
+     Sem sessao (401) ou servidor fora do ar -> o formulario aparece.       */
+  if (window.CONTA_SESSAO) {
+    CONTA_SESSAO.conferir();
+  } else {
+    /* Rede de seguranca: sem o portao, a classe anti-piscada ficaria presa
+       e o formulario nunca apareceria. */
+    document.documentElement.classList.remove("sessao-conferindo");
+  }
 
   LB.iniciar({ pagina: "cadastro" });
   CONTA_UI.pintarIcones();

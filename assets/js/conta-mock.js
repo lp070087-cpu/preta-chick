@@ -8,7 +8,7 @@
    1. Nada aqui e real. E uma maquete de dados para a interface poder ser
       vista e aprovada antes de existir servidor.
 
-   2. NAO existe preco nos materiais da propria La Belle (ver ANALISE.md).
+   2. NAO existe preco nos materiais da propria Preta Chik (ver ANALISE.md).
       Por isso nenhum valor em reais foi inventado. No lugar de preco, o
       pedido carrega `valorSobConsulta: true`, e a interface escreve
       "Valor sob consulta" — exatamente o mesmo criterio que o site publico

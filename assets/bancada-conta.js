@@ -406,8 +406,11 @@ function criarFetch(respostas) {
 }
 
 /* ------------------------------------------------------ montar a pagina */
-function abrirPagina(pagina, respostas) {
-  const html = ler(pagina);
+/* `mexer` e opcional: recebe o texto do HTML e devolve outro. Serve para o
+   CONTROLE NEGATIVO — sabotar a pagina e exigir que a prova acuse. Sem ele
+   a bancada so sabe dizer "passou", nunca "sabe reprovar".               */
+function abrirPagina(pagina, respostas, mexer) {
+  const html = mexer ? mexer(ler(pagina)) : ler(pagina);
   const doc = parsear(html);
   const { urls, inline } = scriptsDaPagina(html);
 
@@ -419,11 +422,19 @@ function abrirPagina(pagina, respostas) {
     /* A pagina vem por parametro: a bancada abre conta.html E login.html. */
     href: pagina, pathname: "/" + pagina, hash: "", search: "", origin: "https://exemplo.test",
     reload: () => { janela.location.__recarregou = true; },
+    /* location.replace: usado pelo portao de sessao (conta-sessao.js). Sem
+       ele o mini-DOM quebraria no codigo CERTO e acusaria o inocente. Aqui
+       ele muda o href como no navegador — a prova le `location.href`.     */
+    replace: (destino) => { janela.location.__troca = destino; janela.location.href = destino; janela.location.pathname = "/" + destino; },
   };
   janela.navigator = { userAgent: "bancada" };
   janela.console = console;
-  janela.setTimeout = (f) => { registro.push(["timeout", f]); return 0; };
-  janela.clearTimeout = () => {};
+  /* RELOGIO REAL. O portao de sessao usa um limite de 6s (setTimeout). Com
+     o duble de timer, `clearTimeout` nao cancelava nada e o limite podia
+     disparar DEPOIS do veredito — um falso "livre" cravado no meio da
+     prova. Com timer de verdade, cancelar cancela e o limite e medido.   */
+  janela.setTimeout = (f, ms) => setTimeout(f, ms);
+  janela.clearTimeout = (t) => clearTimeout(t);
   /* pede o proximo quadro: chama na hora, para nada ficar pendente */
   janela.requestAnimationFrame = (f) => { try { f(0); } catch (e) { /* segue */ } return 0; };
   janela.cancelAnimationFrame = () => {};
@@ -933,9 +944,13 @@ const CLIENTE_SERVIDOR = {
       form.querySelector("[name=senha]").value = "123";
       form.dispatch("submit");
       await assentar();
-      ok(janela.fetch.chamadas.length === 0,
-        "8. campo invalido barra ANTES de chamar o servidor",
-        "chamadas = " + janela.fetch.chamadas.length);
+      /* Conta so o que o FORMULARIO manda. O portao de sessao faz um GET
+         /api/auth/me ao abrir a pagina — isso e legitimo e nao e o que esta
+         prova mede. Medir "nenhuma chamada" acusaria o inocente.          */
+      const envios = janela.fetch.chamadas.filter((c) => (c.init.method || "GET").toUpperCase() === "POST");
+      ok(envios.length === 0,
+        "8. campo invalido barra ANTES de enviar ao servidor",
+        "POSTs = " + envios.length + " | todas: " + janela.fetch.chamadas.map((c) => c.url).join(", "));
       ok(janela.location.href === "login.html", "9. e a pagina nao sai do lugar");
     }
 
@@ -987,6 +1002,236 @@ const CLIENTE_SERVIDOR = {
       ok(errado && /já existe|existe uma conta/i.test(
         (errado.getAttribute("data-erro") || "") + " " + (errado.parentNode ? errado.parentNode.textContent : "")),
         "14. o e-mail duplicado recebe a mensagem amigavel no proprio campo");
+    }
+  }
+
+  /* =================================================================== K */
+  secao("K. PERSISTENCIA: 'Minha conta' com sessao viva nao pede senha (TESTE A-E)");
+  {
+    /* O DEFEITO: todo link "Minha conta" do site aponta para login.html, e
+       a pagina mostrava o formulario SEMPRE — mesmo com sessao viva. Quem
+       estava conectada clicava e caia no login de novo (caso D + E do
+       diagnostico). O portao conta-sessao.js pergunta ao servidor antes.
+       Aqui se prova o COMPORTAMENTO, com a pagina real montada.          */
+
+    /* ---- K1 = TESTE A: sessao viva -> vai para conta.html sem pedir senha */
+    {
+      const { doc, janela } = abrirPagina("login.html", {
+        "/api/auth/me": { status: 200, corpo: { ok: true, autenticado: true, cliente: CLIENTE_SERVIDOR } },
+      });
+      await assentar();
+      ok(janela.location.href === "conta.html",
+        "1. TESTE A — com sessao viva, login.html vai direto para conta.html",
+        "href = " + janela.location.href);
+      ok(janela.location.__troca === "conta.html",
+        "2. TESTE A — a ida e por location.replace (o 'voltar' nao traz o formulario de volta)");
+      const meus = janela.fetch.chamadas.filter((c) => c.url === "/api/auth/me");
+      ok(meus.length === 1, "3. TESTE A — perguntou ao SERVIDOR uma vez quem esta conectado",
+        "GET /api/auth/me = " + meus.length);
+      ok((meus[0].init.credentials || "") === "same-origin",
+        "4. TESTE A — a pergunta leva o cookie (credentials: same-origin)");
+      const envios = janela.fetch.chamadas.filter((c) => (c.init.method || "GET").toUpperCase() === "POST");
+      ok(envios.length === 0, "5. TESTE A — NENHUM login foi enviado: nao pediu senha");
+      /* o formulario nao pode ter sido lido nem preenchido por ninguem */
+      ok(doc.body.querySelector("#formLogin") !== null,
+        "6. TESTE A — o formulario existe no arquivo, so nao chega a ser usado");
+      /* a classe anti-piscada sai do documento no desfecho */
+      const raiz = doc.documentElement || doc.body.parentNode;
+      ok(!raiz.classList.contains("sessao-conferindo"),
+        "7. TESTE A — a classe anti-piscada sai (a tela nao fica escondida)");
+      ok(janela.CONTA_SESSAO.estado() === "indo", "8. TESTE A — o portao registra estado 'indo'");
+    }
+
+    /* ---- K2 = TESTE A (a volta pela loja): 'Minha conta' nao reaparece ---- */
+    {
+      /* A pessoa: entrou, foi para conta.html, clicou "Voltar para a loja",
+         e clicou em "Minha conta". O link leva a login.html — e o portao
+         tem de resolver de novo. Duas aberturas seguidas provam que nao ha
+         memoria escondida no navegador decidindo: o SERVIDOR decide.      */
+      const resp = {
+        "/api/auth/me": { status: 200, corpo: { ok: true, autenticado: true, cliente: CLIENTE_SERVIDOR } },
+      };
+      const a = abrirPagina("login.html", resp); await assentar();
+      const b = abrirPagina("login.html", resp); await assentar();
+      ok(a.janela.location.href === "conta.html" && b.janela.location.href === "conta.html",
+        "9. TESTE A — ida e volta pela loja: 'Minha conta' cai em conta.html nas duas vezes",
+        "1a = " + a.janela.location.href + " | 2a = " + b.janela.location.href);
+      /* nenhum token foi guardado: quem lembra a pessoa e o cookie, no servidor */
+      ok(!a.janela.localStorage.__chaves().length && !b.janela.localStorage.__chaves().length,
+        "10. TESTE A — nada em localStorage (o servidor e a unica fonte)");
+    }
+
+    /* ---- K3 = TESTE B: recarregar a area continua conectada ------------- */
+    {
+      /* Recarregar = montar a pagina de novo com a mesma resposta do
+         servidor. A sessao nao e consumida no primeiro uso.               */
+      const resp = { "/api/auth/me": { status: 200, corpo: { ok: true, autenticado: true, cliente: CLIENTE_SERVIDOR } } };
+      const p1 = abrirConta(resp); await assentar();
+      const p2 = abrirConta(resp); await assentar();
+      ok(p1.janela.CONTA_APP.estado.entrou === true && p2.janela.CONTA_APP.estado.entrou === true,
+        "11. TESTE B — recarregar a area: continua conectada nas duas vezes");
+      ok(!p1.doc.body.querySelector("#areaConta").classList.contains("oculto") &&
+         !p2.doc.body.querySelector("#areaConta").classList.contains("oculto"),
+        "12. TESTE B — a area aparece nas duas vezes (a sessao nao 'gasta')");
+      /* e o portao, na pagina de acesso, tambem continua levando para a area */
+      const g = abrirPagina("login.html", resp); await assentar();
+      ok(g.janela.location.href === "conta.html",
+        "13. TESTE B — depois de recarregar, 'Minha conta' ainda vai para conta.html",
+        "href = " + g.janela.location.href);
+    }
+
+    /* ---- K4 = TESTE C: formato do cookie persistente -------------------- */
+    {
+      /* Nao basta LER o fonte: aqui o proprio serializador de cookie do
+         servidor e EXECUTADO, e a data de expiracao que o login realmente
+         grava e transformada em Max-Age. O que se mede e o numero de
+         segundos que o NAVEGADOR vai guardar — e se ele cobre 30 dias.    */
+      const RAIZ_SERVIDOR = path.join(RAIZ, "api", "_lib", "sessao.js");
+      const S = require(RAIZ_SERVIDOR);
+      ok(S.DIAS_PERSISTENTE === 30, "14. TESTE C — o servidor declara 30 dias",
+        "DIAS_PERSISTENTE = " + S.DIAS_PERSISTENTE);
+      ok(S.HORAS_PADRAO === 12, "15. TESTE C — sem 'Manter conectado' sao 12 horas",
+        "HORAS_PADRAO = " + S.HORAS_PADRAO);
+
+      /* 1) com "Manter conectado": a expiracao que o login grava */
+      const agora = Date.now();
+      const expPersistente = new Date(agora + S.DIAS_PERSISTENTE * 86400000).toISOString();
+      const cP = S.serializarCookie("token-de-teste", expPersistente, true);
+      const mP = /Max-Age=(\d+)/.exec(cP);
+      ok(!!mP, "16. TESTE C — com 'Manter conectado' o cookie sai com Max-Age");
+      const segundos = mP ? Number(mP[1]) : 0;
+      const diasReais = segundos / 86400;
+      ok(Math.abs(diasReais - 30) <= 0.01,
+        "17. TESTE C — o Max-Age vale 30 dias de verdade (2592000 s)",
+        "Max-Age=" + segundos + " s = " + diasReais.toFixed(2) + " dias");
+      ok(/HttpOnly/.test(cP) && /SameSite=Lax/.test(cP) && /Path=\//.test(cP),
+        "18. TESTE C — HttpOnly + SameSite=Lax + Path=/ no cookie persistente", cP);
+
+      /* 2) SEM "Manter conectado": nenhum Max-Age -> morre ao fechar */
+      const cS = S.serializarCookie("token-de-teste", new Date(agora + 12 * 3600000).toISOString(), false);
+      ok(!/Max-Age/.test(cS),
+        "19. TESTE C — sem 'Manter conectado' NAO ha Max-Age (sessao do navegador)", cS);
+
+      /* 3) Secure: ligado em producao, desligado em desenvolvimento */
+      const antes = process.env.NODE_ENV;
+      process.env.NODE_ENV = "production";
+      ok(/; Secure/.test(S.serializarCookie("t", expPersistente, true)),
+        "20. TESTE C — em producao (Vercel) o cookie leva Secure");
+      process.env.NODE_ENV = "development";
+      ok(!/Secure/.test(S.serializarCookie("t", expPersistente, true)),
+        "21. TESTE C — em desenvolvimento nao leva Secure (http local)");
+      if (antes === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = antes;
+
+      /* 4) logout: o cookie sai expirado */
+      ok(/Max-Age=0/.test(S.cookieDeSaida()),
+        "22. TESTE C — o logout manda Max-Age=0 (o navegador apaga o cookie)", S.cookieDeSaida());
+    }
+
+    /* ---- K5 = TESTE D: sair da conta derruba a sessao de verdade -------- */
+    {
+      /* Depois de "Sair da conta", abrir login.html tem de mostrar o
+         formulario DE NOVO — e nao ir para conta.html. A bancada da area
+         prova que o sair chama o servidor; aqui se prova o EFEITO na
+         proxima visita a pagina de acesso.                                */
+      const { doc, janela } = abrirPagina("login.html", {
+        "/api/auth/me": { status: 401, corpo: { erro: "A sua sessão expirou. Entre de novo, por favor." } },
+      });
+      await assentar();
+      ok(janela.location.href === "login.html",
+        "23. TESTE D — sem sessao, login.html NAO redireciona (mostra o formulario)",
+        "href = " + janela.location.href);
+      ok(janela.CONTA_SESSAO.estado() === "livre", "24. TESTE D — o portao libera a pagina");
+      const raiz = doc.documentElement || doc.body.parentNode;
+      ok(!raiz.classList.contains("sessao-conferindo"),
+        "25. TESTE D — a tela nunca fica presa escondida");
+      ok(doc.body.querySelector("#formLogin") !== null,
+        "26. TESTE D — o formulario esta la, pronto para o novo login");
+    }
+
+    /* ---- K6 = TESTE E: quem nao tem sessao consegue entrar ------------- */
+    {
+      const { doc, janela } = abrirPagina("login.html", {
+        "/api/auth/me": { status: 401, corpo: { erro: "A sua sessão expirou. Entre de novo, por favor." } },
+        "/api/auth/login": { status: 200, corpo: { ok: true, cliente: CLIENTE_SERVIDOR } },
+      });
+      await assentar();
+      const form = doc.body.querySelector("#formLogin");
+      form.querySelector("[name=email]").value = "joana.ribeiro@exemplo.com";
+      form.querySelector("[name=senha]").value = "SenhaBoa2024";
+      form.querySelector("[name=manter]").checked = true;
+      form.dispatch("submit");
+      await assentar();
+      ok(janela.location.href === "conta.html",
+        "27. TESTE E — sem sessao, o login normal funciona e entra na area",
+        "href = " + janela.location.href);
+      const corpo = JSON.stringify((janela.fetch.chamadas.find((c) => c.url === "/api/auth/login") || {}).init || {});
+      ok(corpo.indexOf("SenhaBoa2024") > -1,
+        "28. TESTE E — a senha foi no corpo do POST (nao na URL)");
+      ok(corpo.indexOf("manter") > -1,
+        "29. TESTE E — 'Manter conectado' marcado vai junto para o servidor");
+      ok(janela.localStorage.__chaves().length === 0,
+        "30. TESTE E — a senha NAO foi guardada no navegador");
+    }
+
+    /* ---- K7: servidor fora do ar NAO pode virar 'deslogado' ------------ */
+    {
+      const { doc, janela } = abrirPagina("login.html", {
+        "/api/auth/me": { status: 503, corpo: { erro: "Não foi possível falar com o banco agora." } },
+      });
+      await assentar();
+      ok(janela.location.href === "login.html",
+        "31. servidor com problema NAO manda para conta.html");
+      ok(doc.body.querySelector("#formLogin") !== null,
+        "32. servidor com problema mostra o formulario (unica tela possivel)");
+      /* o ponto que importa: nada foi APAGADO. O portao nao chama /sair,
+         nao limpa cookie, nao grava nada. Quando o banco voltar, a sessao
+         continua viva no servidor.                                       */
+      const mutantes = janela.fetch.chamadas.filter((c) => /sair|logout|redefinir/.test(c.url));
+      ok(mutantes.length === 0, "33. servidor com problema NAO derruba a sessao de ninguem");
+      const raiz = doc.documentElement || doc.body.parentNode;
+      ok(!raiz.classList.contains("sessao-conferindo"),
+        "34. servidor com problema nao deixa a tela presa escondida");
+    }
+
+    /* ---- K8 = CONTROLE NEGATIVO: o instrumento sabe reprovar ----------- */
+    {
+      /* Primeiro, a pagina de verdade: o portao esta la.                    */
+      const original = ler("login.html");
+      ok(original.indexOf("CONTA_SESSAO.conferir()") > -1,
+        "35. CONTROLE — login.html chama o portao");
+      /* Agora o MESMO aparato, com a chamada do portao arrancada. Se a
+         prova continuar verde, ela nao esta medindo o portao — e as provas
+         acima nao valeriam nada.                                            */
+      const sabotada = abrirPagina("login.html", {
+        "/api/auth/me": { status: 200, corpo: { ok: true, autenticado: true, cliente: CLIENTE_SERVIDOR } },
+      }, (h) => h.replace("CONTA_SESSAO.conferir();", ";"));
+      await assentar();
+      ok(sabotada.janela.location.href === "login.html",
+        "36. CONTROLE NEGATIVO — SEM o portao, login.html NAO sai do lugar",
+        "href = " + sabotada.janela.location.href);
+      ok(sabotada.janela.fetch.chamadas.length === 0,
+        "37. CONTROLE NEGATIVO — SEM o portao, ninguem pergunta ao servidor quem esta conectado",
+        "chamadas = " + sabotada.janela.fetch.chamadas.length);
+
+      /* E se conta-sessao.js nem CARREGAR? A classe anti-piscada ficaria
+         presa e o formulario nunca apareceria — pior do que o defeito
+         original. A rede de seguranca tira a classe. Prova-se sabotando o
+         carregamento do arquivo.                                          */
+      const semArquivo = abrirPagina("login.html", {}, (h) =>
+        h.replace('<script src="assets/js/conta-sessao.js"></script>', ""));
+      await assentar();
+      const raizS = semArquivo.doc.documentElement || semArquivo.doc.body.parentNode;
+      ok(semArquivo.janela.CONTA_SESSAO === undefined,
+        "38. CONTROLE NEGATIVO — com o arquivo ausente, CONTA_SESSAO nao existe");
+      /* A classe e ADICIONADA pela linha inline do <head>. Sem esta prova,
+         "a classe nao esta la" poderia significar so que ela nunca chegou a
+         ser posta — e a prova de baixo passaria por motivo errado.        */
+      ok(ler("login.html").indexOf('className += " sessao-conferindo"') > -1,
+        "39. a classe anti-piscada E adicionada pela pagina (a ausencia de baixo e remocao, nao omissao)");
+      ok(!raizS.classList.contains("sessao-conferindo"),
+        "40. REDE DE SEGURANCA — sem o arquivo, a classe foi REMOVIDA (a tela nao fica presa)");
+      ok(semArquivo.doc.body.querySelector("#formLogin") !== null,
+        "41. REDE DE SEGURANCA — o formulario aparece (a pagina nao fica em branco)");
     }
   }
 

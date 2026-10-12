@@ -54,7 +54,7 @@ var CONTA_APP = (function () {
     return '<span class="' + (cls || "cx-ic") + '" aria-hidden="true">' + CONTA_UI.svg(nome) + "</span>";
   }
 
-  /* O projeto nao inventa preco: os materiais da La Belle nao trazem valor.
+  /* O projeto nao inventa preco: os materiais da Preta Chik nao trazem valor.
      Onde o site publico escreve "Valor sob consulta", a area do cliente
      escreve o mesmo — em vez de somar numeros que ninguem informou.        */
   function valorHTML() {
@@ -114,7 +114,7 @@ var CONTA_APP = (function () {
     var h = '<section aria-labelledby="t-visao">' +
       '<div class="cx-cabeca">' +
         '<div><h1 id="t-visao" class="cx-titulo">Olá, ' + escapa(primeiro) + '</h1>' +
-        '<p>Este é o resumo da sua conta na La Belle.</p></div>' +
+        '<p>Este é o resumo da sua conta na Preta Chik.</p></div>' +
       '</div>';
 
     h += '<div class="cx-grade">';
@@ -160,7 +160,7 @@ var CONTA_APP = (function () {
       '<p>Toque em um pedido para ver as peças, o pagamento e a entrega.</p></div></div>';
 
     if (!S.pedidos.length) {
-      h += "<p>Você ainda não fez nenhum pedido na La Belle.</p>";
+      h += "<p>Você ainda não fez nenhum pedido na Preta Chik.</p>";
       h += '<a class="bt bt--rosa" href="loja.html">Ver a loja</a></section>';
       return h;
     }
@@ -275,7 +275,7 @@ var CONTA_APP = (function () {
   function avisoCancelado() {
     return '<div class="cx-cancelado">' + icone("info") +
       "<p><b>Este pedido foi cancelado.</b> Se ficou alguma dúvida sobre o cancelamento ou sobre " +
-      "um possível reembolso, fale direto com a loja pelo WhatsApp — a La Belle responde por lá.</p></div>";
+      "um possível reembolso, fale direto com a loja pelo WhatsApp — a Preta Chik responde por lá.</p></div>";
   }
 
   /* ======================================================= 4. ENDERECOS */
@@ -352,7 +352,7 @@ var CONTA_APP = (function () {
     var h = '<section aria-labelledby="t-dados">' +
       '<div class="cx-cabeca"><div>' +
       '<h1 id="t-dados" class="cx-titulo">Meus dados</h1>' +
-      "<p>Como a La Belle fala com você e como você aparece na sua conta.</p></div></div>";
+      "<p>Como a Preta Chik fala com você e como você aparece na sua conta.</p></div></div>";
 
     h += '<div class="cx-grade" style="margin-bottom:1.6rem">' +
       '<div class="cx-cartao"><span>Nome na conta</span><b style="font-size:1.1rem">' +
@@ -394,7 +394,7 @@ var CONTA_APP = (function () {
     return '<section aria-labelledby="t-seg">' +
       '<div class="cx-cabeca"><div>' +
       '<h1 id="t-seg" class="cx-titulo">Segurança</h1>' +
-      "<p>Trocar a senha da sua conta La Belle.</p></div></div>" +
+      "<p>Trocar a senha da sua conta Preta Chik.</p></div></div>" +
 
       '<div class="cx-aviso">' + icone("info") +
       "<p><b>A sua senha é conferida e trocada no servidor.</b> Aqui só viaja pelo HTTPS, e o " +
@@ -816,8 +816,8 @@ var CONTA_APP = (function () {
           if (R.conferindo) {
             R.conferindo.innerHTML =
               '<div class="entrar__lado"><div class="entrar__caixa">' +
-                '<div class="cx-marca"><img src="assets/img/logo/labelle-avatar.webp" alt="" width="46" height="46">' +
-                "<b>La <i>Belle</i></b></div>" +
+                '<div class="cx-marca"><img src="assets/img/logo/preta-chik.jpg" alt="" width="46" height="46">' +
+                "<b>Preta <i>Chik</i></b></div>" +
                 '<h1 class="cx-titulo">Não consegui abrir a sua conta</h1>' +
                 "<p class=\"cx-sub\">O servidor não respondeu agora. Tente de novo em instantes.</p>" +
                 '<div class="cx-form__acoes" style="margin-top:0">' +

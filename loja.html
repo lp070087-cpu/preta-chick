@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Loja — La Belle Modas</title>
-<meta name="description" content="Vestidos, conjuntos, blusas, calças, saias e shorts da La Belle Modas. Enviamos para todo o Brasil.">
+<title>Loja — Preta Chik Moda Praia</title>
+<meta name="description" content="Vestidos, conjuntos, blusas, calças, saias e shorts da Preta Chik Moda Praia. Enviamos para todo o Brasil.">
 <meta name="theme-color" content="#0f1116">
-<link rel="icon" href="assets/img/logo/labelle-avatar-sm.webp">
+<link rel="icon" href="assets/img/logo/preta-chik.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Jost:wght@200;300;400;500&display=swap">
@@ -29,7 +29,7 @@
       <span class="em em--rosa rev">Todas as peças</span>
       <h1 class="rev" style="--atraso:60ms" id="tituloLoja">Loja</h1>
       <p class="texto-medio rev" style="--atraso:120ms" id="textoLoja">
-        Vestidos, conjuntos, blusas, calças, saias e shorts escolhidos pela La Belle.
+        Vestidos, conjuntos, blusas, calças, saias e shorts escolhidos pela Preta Chik.
         Enviamos para todo o Brasil.
       </p>
     </header>
@@ -62,10 +62,10 @@
         <div class="filtros__bloco" style="border-bottom:0">
           <h4>Preço</h4>
           <p class="texto-peq" style="margin-bottom:.9rem">
-            Os materiais da loja não trazem tabela de preços. Fale com a La Belle pelo WhatsApp
+            Os materiais da loja não trazem tabela de preços. Fale com a Preta Chik pelo WhatsApp
             para saber o valor das peças.
           </p>
-          <a class="bt bt--vazio bt--pequeno bt--largo" href="https://wa.me/message/KC6Z4GSRHU6TF1" target="_blank" rel="noopener">Consultar valores</a>
+          <a class="bt bt--vazio bt--pequeno bt--largo" href="https://wa.me/5581984023286" target="_blank" rel="noopener">Consultar valores</a>
         </div>
 
         <button class="bt bt--vazio bt--pequeno bt--largo" type="button" id="limparFiltros">Limpar filtros</button>
@@ -113,15 +113,15 @@
 
   var ROTULOS = {
     todos: "Todas as peças",
-    lancamentos: "Lançamentos",
-    vestidos: "Vestidos",
-    conjuntos: "Conjuntos",
-    blusas: "Blusas e tops",
-    calcas: "Calças",
-    saias: "Saias e shorts",
+    novidades: "Novidades",
+    biquinis: "Biquínis",
+    "conjuntos-praia": "Conjuntos Praia",
+    "tops-praia": "Tops de Praia",
+    maios: "Maiôs",
+    "saidas-praia": "Saídas de Praia",
     promocoes: "Promoções"
   };
-  var ORDEM_CAT = ["lancamentos", "vestidos", "conjuntos", "blusas", "calcas", "saias", "promocoes"];
+  var ORDEM_CAT = ["novidades", "biquinis", "conjuntos-praia", "tops-praia", "maios", "saidas-praia", "promocoes"];
 
   var filtro = { cat: "todos", tam: null, cor: null, ordem: "destaque" };
 
@@ -203,14 +203,14 @@
     var rotulo = ROTULOS[filtro.cat] || "Loja";
     document.querySelector("#tituloLoja").textContent = rotulo;
     document.querySelector("#migalhaAtual").textContent = rotulo;
-    document.title = rotulo + " — La Belle Modas";
+    document.title = rotulo + " — Preta Chik Moda Praia";
     var texto = document.querySelector("#textoLoja");
     if (filtro.cat === "promocoes") {
       texto.textContent = "Peças selecionadas com condição especial. Fale com a loja para saber o valor.";
-    } else if (filtro.cat === "lancamentos") {
-      texto.textContent = "As peças que acabaram de chegar na arara da La Belle.";
+    } else if (filtro.cat === "novidades") {
+      texto.textContent = "As peças que acabaram de chegar na arara da Preta Chik.";
     } else {
-      texto.textContent = "Vestidos, conjuntos, blusas, calças, saias e shorts escolhidos pela La Belle. Enviamos para todo o Brasil.";
+      texto.textContent = "Vestidos, conjuntos, blusas, calças, saias e shorts escolhidos pela Preta Chik. Enviamos para todo o Brasil.";
     }
 
     desenharFiltroCategoria();

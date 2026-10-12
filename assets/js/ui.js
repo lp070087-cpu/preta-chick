@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    ui.js — casca comum da apresentacao
    cabecalho, faixa, gavetas (menu e sacola), busca, rapida, toasts,
    revelacao no scroll, cartao de produto.
@@ -41,20 +41,20 @@ const LB = (function () {
   /* ---------------------------------------------------------------- NAV */
   const NAV = [
     { txt: "Início",     href: "index.html" },
-    { txt: "Novidades",  href: "loja.html?cat=lancamentos", marca: true },
+    { txt: "Novidades",  href: "loja.html?cat=novidades", marca: true },
     { txt: "Roupas",     href: "loja.html", painel: true },
-    { txt: "Conjuntos",  href: "loja.html?cat=conjuntos" },
-    { txt: "Vestidos",   href: "loja.html?cat=vestidos" },
+    { txt: "Conjuntos",  href: "loja.html?cat=conjuntos-praia" },
+    { txt: "Biquínis",   href: "loja.html?cat=biquinis" },
     { txt: "Promoções",  href: "loja.html?cat=promocoes" }
   ];
 
   const PAINEL = [
     { titulo: "Por peça", itens: [
-      { txt: "Vestidos", href: "loja.html?cat=vestidos" },
-      { txt: "Conjuntos", href: "loja.html?cat=conjuntos" },
-      { txt: "Blusas e tops", href: "loja.html?cat=blusas" },
-      { txt: "Calças", href: "loja.html?cat=calcas" },
-      { txt: "Saias e shorts", href: "loja.html?cat=saias" }
+      { txt: "Biquínis", href: "loja.html?cat=biquinis" },
+      { txt: "Conjuntos", href: "loja.html?cat=conjuntos-praia" },
+      { txt: "Blusas e tops", href: "loja.html?cat=tops-praia" },
+      { txt: "Calças", href: "loja.html?cat=maios" },
+      { txt: "Saias e shorts", href: "loja.html?cat=saidas-praia" }
     ]},
     { titulo: "Por ocasião", itens: [
       { txt: "Dia a dia", href: "loja.html" },
@@ -63,14 +63,14 @@ const LB = (function () {
       { txt: "Trabalho", href: "loja.html" }
     ]},
     { titulo: "Destaques", itens: [
-      { txt: "Lançamentos", href: "loja.html?cat=lancamentos" },
+      { txt: "Lançamentos", href: "loja.html?cat=novidades" },
       { txt: "Mais desejadas", href: "loja.html" },
       { txt: "Promoções", href: "loja.html?cat=promocoes" },
       { txt: "Presentes e brindes", href: "sobre.html#brindes" }
     ]},
     { titulo: "A loja", itens: [
-      { txt: "Sobre a La Belle", href: "sobre.html" },
-      { txt: "Instagram", href: "https://www.instagram.com/labellemodas02/", fora: true },
+      { txt: "Sobre a Preta Chik", href: "sobre.html" },
+      { txt: "Instagram", href: "https://www.instagram.com/pretachik_modapraiaa/", fora: true },
       { txt: "Trocas e devoluções", href: "trocas.html" },
       { txt: "Minha conta", href: "login.html" }
     ]}
@@ -214,7 +214,7 @@ const LB = (function () {
           '<span>' + ICO.presente + ' Brindes especiais a cada compra</span>' +
         '</div>' +
         '<div class="faixa__dir">' +
-          '<a href="https://www.instagram.com/labellemodas02/" target="_blank" rel="noopener">@labellemodas02</a>' +
+          '<a href="https://www.instagram.com/pretachik_modapraiaa/" target="_blank" rel="noopener">@pretachik_modapraiaa</a>' +
           '<a href="trocas.html">Trocas e devoluções</a>' +
           '<a href="login.html">Minha conta</a>' +
         '</div>' +
@@ -225,9 +225,9 @@ const LB = (function () {
       '<div class="envelope cabecalho__dentro">' +
         '<nav class="nav" aria-label="Menu principal"><ul style="display:flex;gap:inherit;align-items:center">' + linkNav + '</ul></nav>' +
         '<button class="icone-bt hamb" id="btMenu" aria-label="Abrir menu" aria-expanded="false" aria-controls="gmenu">' + ICO.menu + '</button>' +
-        '<a class="marca" href="index.html" aria-label="La Belle Modas — página inicial">' +
-          '<span class="marca__disco"><img src="assets/img/logo/labelle-avatar-sm.webp" alt="La Belle Modas" width="80" height="80"></span>' +
-          '<span class="marca__nome"><b>La <i>Belle</i></b><small>Modas</small></span>' +
+        '<a class="marca" href="index.html" aria-label="Preta Chik Moda Praia — página inicial">' +
+          '<span class="marca__disco"><img src="assets/img/logo/preta-chik.jpg" alt="Preta Chik Moda Praia" width="80" height="80"></span>' +
+          '<span class="marca__nome"><b>Preta <i>Chik</i></b><small>Moda Praia</small></span>' +
         '</a>' +
         '<div class="acoes">' +
           '<button class="icone-bt" id="btBusca" aria-label="Buscar produtos">' + ICO.busca + '</button>' +
@@ -248,7 +248,7 @@ const LB = (function () {
               return '<li><a href="' + i.href + '"' + (i.fora ? ' target="_blank" rel="noopener"' : '') + '>' + i.txt + '</a></li>';
             }).join("") + '</ul></div>';
         }).join("") +
-        '<figure class="painel__destaque"><img src="assets/img/cat/cat-lancamentos.webp" alt="Novidades da La Belle" loading="lazy" width="760" height="1010">' +
+        '<figure class="painel__destaque"><img src="assets/img/cat/cat-lancamentos.jpg" alt="Novidades da Preta Chik" loading="lazy" width="760" height="1010">' +
         '<figcaption>Recém-chegadas na arara</figcaption></figure>' +
       '</div>' +
     '</div>';
@@ -306,7 +306,7 @@ const LB = (function () {
       '<aside class="gmenu" id="gmenu" aria-hidden="true" aria-label="Menu">' +
         '<div class="gmenu__dentro">' +
           '<div class="gmenu__topo">' +
-            '<span class="em em--claro">La Belle Modas</span>' +
+            '<span class="em em--claro">Preta Chik Moda Praia</span>' +
             '<button class="icone-bt" data-fecha="gmenu" aria-label="Fechar menu">' + ICO.fechar + '</button>' +
           '</div>' +
           '<ul class="gmenu__lista">' +
@@ -339,7 +339,7 @@ const LB = (function () {
     const busca = el('' +
       '<div class="busca" id="busca" role="dialog" aria-modal="true" aria-label="Buscar produtos">' +
         '<div class="busca__topo">' +
-          '<span class="em">Buscar na La Belle</span>' +
+          '<span class="em">Buscar na Preta Chik</span>' +
           '<button class="icone-bt" data-fecha="busca" aria-label="Fechar busca">' + ICO.fechar + '</button>' +
         '</div>' +
         '<div class="busca__dentro">' +
@@ -510,8 +510,8 @@ const LB = (function () {
         '<div class="rodape__grade">' +
           '<div>' +
             '<div class="rodape__marca">' +
-              '<span class="marca__disco"><img src="assets/img/logo/labelle-avatar-sm.webp" alt="La Belle Modas" width="80" height="80" loading="lazy"></span>' +
-              '<span><b>La <i>Belle</i></b><small>Modas</small></span>' +
+              '<span class="marca__disco"><img src="assets/img/logo/preta-chik.jpg" alt="Preta Chik Moda Praia" width="80" height="80" loading="lazy"></span>' +
+              '<span><b>Preta <i>Chik</i></b><small>Moda Praia</small></span>' +
             '</div>' +
             '<p>' + escapa(LOJA.bio) + '. Boutique de moda feminina em ' + escapa(LOJA.cidade) + ', enviando para todo o Brasil.</p>' +
             '<div class="rodape__selos">' +
@@ -520,16 +520,16 @@ const LB = (function () {
               '<span>' + ICO.troca + ' Troca em 7 dias</span>' +
             '</div>' +
             '<div class="rodape__sociais">' +
-              '<a href="' + LOJA.instagramUrl + '" target="_blank" rel="noopener" aria-label="Instagram da La Belle">' + ICO.instagram + '</a>' +
-              '<a href="' + LOJA.whatsapp + '" target="_blank" rel="noopener" aria-label="WhatsApp da La Belle">' + ICO.zap + '</a>' +
+              '<a href="' + LOJA.instagramUrl + '" target="_blank" rel="noopener" aria-label="Instagram da Preta Chik">' + ICO.instagram + '</a>' +
+              '<a href="' + LOJA.whatsapp + '" target="_blank" rel="noopener" aria-label="WhatsApp da Preta Chik">' + ICO.zap + '</a>' +
             '</div>' +
           '</div>' +
           '<div><h4>Comprar</h4><ul>' +
-            '<li><a href="loja.html?cat=lancamentos">Novidades</a></li>' +
-            '<li><a href="loja.html?cat=vestidos">Vestidos</a></li>' +
-            '<li><a href="loja.html?cat=conjuntos">Conjuntos</a></li>' +
-            '<li><a href="loja.html?cat=blusas">Blusas e tops</a></li>' +
-            '<li><a href="loja.html?cat=calcas">Calças</a></li>' +
+            '<li><a href="loja.html?cat=novidades">Novidades</a></li>' +
+            '<li><a href="loja.html?cat=biquinis">Biquínis</a></li>' +
+            '<li><a href="loja.html?cat=conjuntos-praia">Conjuntos Praia</a></li>' +
+            '<li><a href="loja.html?cat=tops-praia">Tops de Praia</a></li>' +
+            '<li><a href="loja.html?cat=maios">Maiôs</a></li>' +
             '<li><a href="loja.html?cat=promocoes">Promoções</a></li>' +
           '</ul></div>' +
           '<div><h4>Ajuda</h4><ul>' +
@@ -548,7 +548,7 @@ const LB = (function () {
           '</ul></div>' +
         '</div>' +
         '<div class="rodape__base">' +
-          '<p>© ' + new Date().getFullYear() + ' La Belle Modas. Todos os direitos reservados.</p>' +
+          '<p>© ' + new Date().getFullYear() + ' Preta Chik Moda Praia. Todos os direitos reservados.</p>' +
           '<nav>' +
             '<a href="trocas.html">Trocas e devoluções</a>' +
             '<a href="sobre.html#contato">Atendimento</a>' +
@@ -557,7 +557,7 @@ const LB = (function () {
         '</div>' +
       '</div>' +
     '</footer>' +
-    '<a class="zap" href="' + LOJA.whatsapp + '" target="_blank" rel="noopener" aria-label="Falar com a La Belle no WhatsApp">' + ICO.zap + '<span>Falar com a loja</span></a>';
+    '<a class="zap" href="' + LOJA.whatsapp + '" target="_blank" rel="noopener" aria-label="Falar com a Preta Chik no WhatsApp">' + ICO.zap + '<span>Falar com a loja</span></a>';
   }
 
   /* --------------------------------------------------------- REVELACAO */

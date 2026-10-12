@@ -8,12 +8,12 @@
 /* ---------- 1. TOKENS ---------- */
 :root {
   /* marca */
-  --rosa:        #ff65c3;   /* rosa da loja — medido no print dos destaques */
-  --rosa-forte:  #e8318f;
-  --rosa-escuro: #b81f6d;
-  --rosa-claro:  #ffd9ef;
-  --rosa-lavado: #fff1f9;
-  --rosa-po:     #f7e4ee;   /* fundo do logo */
+  --rosa:        #B99145;   /* rosa da loja — medido no print dos destaques */
+  --rosa-forte:  #B99145;
+  --rosa-escuro: #856323;
+  --rosa-claro:  #EAD9B5;
+  --rosa-lavado: #FBF6EB;
+  --rosa-po:     #F4E9D4;   /* fundo do logo */
 
   /* neutros */
   --tinta:       #0f1116;   /* preto principal */

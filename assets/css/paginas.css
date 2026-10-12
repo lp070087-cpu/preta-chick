@@ -78,7 +78,7 @@
 .tamanhos button:hover { border-color: var(--tinta); }
 .tamanhos button.on { background: var(--tinta); border-color: var(--tinta); color: #fff; }
 .tamanhos button:disabled { opacity: .35; text-decoration: line-through; cursor: not-allowed; }
-.cores { display: flex; gap: .55rem; }
+.cores { display: flex; flex-wrap: wrap; gap: .55rem; width: 100%; max-width: 100%; align-items: center; }
 .cores button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(15,17,22,.15); position: relative; transition: var(--t-rapido); }
 .cores button.on { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--tinta); }
 .prod__compra { display: flex; gap: .6rem; align-items: stretch; margin-bottom: .9rem; }
