@@ -544,7 +544,7 @@ const LB = (function () {
             '<li>' + ICO.pino + '<span>' + escapa(LOJA.endereco) + '<br>' + escapa(LOJA.cidade) + '</span></li>' +
             '<li>' + ICO.zap + '<a href="' + LOJA.whatsapp + '" target="_blank" rel="noopener">Atendimento pelo WhatsApp</a></li>' +
             '<li>' + ICO.instagram + '<a href="' + LOJA.instagramUrl + '" target="_blank" rel="noopener">@' + escapa(LOJA.instagram) + '</a></li>' +
-            '<li>' + ICO.conta + '<span>Representante autorizada<br>' + escapa(LOJA.representante) + '</span></li>' +
+            '<li>' + ICO.conta + '<span>Moda praia e novidades</span></li>' +
           '</ul></div>' +
         '</div>' +
         '<div class="rodape__base">' +

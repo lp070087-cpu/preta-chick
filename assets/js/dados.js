@@ -16,13 +16,13 @@ const LOJA = {
   assinatura: "Preta Chik Moda Praia",
   instagram: "pretachik_modapraiaa",
   instagramUrl: "https://www.instagram.com/pretachik_modapraiaa/",
-  seguidores: "379 mil",
+  seguidores: "45,8 mil",
   publicacoes: "7.975",
   bio: "Sua melhor versão começa no verão",
   identidade: "Vestuário (marca)",
   cidade: "SÓ VEREJO",
-  representante: "@mariagueixa",
-  endereco: "Estrada de Águas Compridas, 395",
+  representante: "",
+  endereco: "Estrada de Águas Compridas, 385",
   whatsapp: "https://wa.me/5581984023286",
   destaques: [
     { nome: "Envios",      icone: "logo/icon-envios"   },
@@ -73,11 +73,11 @@ const TROCAS = [
    do destaque, nao um titulo oficial de post.
    ---------------------------------------------------------------- */
 const REELS = [
-  { url: "https://www.instagram.com/p/Dc2B878tsQ9/", img: "reel/r01", titulo: "Look do dia",     tag: "Novidades" },
-  { url: "https://www.instagram.com/reel/DcE6C9ypXfI/", img: "reel/r02", titulo: "Prova de looks",  tag: "Loja" },
-  { url: "https://www.instagram.com/reel/DIoO3JVRPew/", img: "reel/r03", titulo: "Novo na arara",   tag: "Chegou" },
-  { url: "https://www.instagram.com/reel/DYrnd-tJKaz/", img: "reel/r04", titulo: "Combinação",      tag: "Monte seu look" },
-  { url: "https://www.instagram.com/reel/DItnCnnxt6C/", img: "reel/r05", titulo: "Direto da loja",  tag: "Bastidores" }
+  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r01", titulo: "Look do dia",     tag: "Novidades" },
+  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r02", titulo: "Prova de looks",  tag: "Loja" },
+  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r03", titulo: "Novo na arara",   tag: "Chegou" },
+  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r04", titulo: "Combinação",      tag: "Monte seu look" },
+  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r05", titulo: "Direto da loja",  tag: "Bastidores" }
 ];
 
 /* ------------------------------------------------------------- CATEGORIAS */
@@ -100,25 +100,25 @@ const CATEGORIAS = [
    materiais da loja: por isso "sob consulta" em vez de valor.
    ---------------------------------------------------------------- */
 const PRODUTOS = [
-  { id: "p01", nome: "Top Halter Canelado",        cat: "tops-praia",    cats: ["tops-praia","novidades"],  cor: "Branco",      cores: ["#f6f4f1","#ff65c3","#0f1116"], badges: ["Novo"] },
-  { id: "p02", nome: "Bustie Estruturado",         cat: "tops-praia",    cats: ["tops-praia","novidades"],  cor: "Branco",      cores: ["#f6f4f1","#d9c9b8"],            badges: ["Novo"] },
-  { id: "p03", nome: "Vestido Curto Plissado",     cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Rosa claro",  cores: ["#f4cdd9","#0f1116","#e6e2dc"],  badges: ["Novo"] },
-  { id: "p04", nome: "Vestido Preto Drapeado",     cat: "biquinis",  cats: ["biquinis","novidades"],cor: "Preto",       cores: ["#141419","#7a3b2e"],            badges: [] },
-  { id: "p05", nome: "Conjunto Ombro Único",       cat: "conjuntos-praia", cats: ["conjuntos-praia","novidades"],cor: "Verde limão", cores: ["#d8e86a","#f6f4f1"],           badges: ["Novo"] },
-  { id: "p06", nome: "Top Caramelo",               cat: "tops-praia",    cats: ["tops-praia"],                cor: "Caramelo",    cores: ["#b57a4a","#0f1116"],            badges: [] },
-  { id: "p07", nome: "Vestido Longo Ondulado",     cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Verde água",  cores: ["#9fd8cf","#f6f4f1"],            badges: [] },
-  { id: "p08", nome: "Conjunto Alfaiataria Leve",  cat: "conjuntos-praia", cats: ["conjuntos-praia","novidades"],cor: "Laranja",     cores: ["#ef8a4d","#f6f4f1"],           badges: ["Novo"] },
-  { id: "p09", nome: "Vestido Longo com Fenda",    cat: "biquinis",  cats: ["biquinis","novidades"],cor: "Sortido",     cores: ["#f6f4f1","#f4cdd9","#141419"],  badges: ["Novo"] },
-  { id: "p10", nome: "Vestido Curto Midi",         cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Laranja",     cores: ["#ef7a3c","#f6f4f1"],            badges: [] },
-  { id: "p11", nome: "Vestido Longo Fluido",       cat: "biquinis",  cats: ["biquinis"],              cor: "Azul",        cores: ["#8fb6d9","#f6f4f1"],            badges: [] },
-  { id: "p12", nome: "Bustie com Amarração",       cat: "tops-praia",    cats: ["tops-praia","promocoes"],    cor: "Branco",      cores: ["#f6f4f1","#c9d3e0"],            badges: [] },
+  { id: "p01", nome: "Biquíni Preto com Amarração",        cat: "tops-praia",    cats: ["tops-praia","novidades"],  cor: "Branco",      cores: ["#f6f4f1","#ff65c3","#0f1116"], badges: ["Novo"] },
+  { id: "p02", nome: "Conjunto Praia Verde e Rosa",         cat: "tops-praia",    cats: ["tops-praia","novidades"],  cor: "Branco",      cores: ["#f6f4f1","#d9c9b8"],            badges: ["Novo"] },
+  { id: "p03", nome: "Biquíni com Saída Laranja",     cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Rosa claro",  cores: ["#f4cdd9","#0f1116","#e6e2dc"],  badges: ["Novo"] },
+  { id: "p04", nome: "Conjunto Praia Preto com Transparência",     cat: "biquinis",  cats: ["biquinis","novidades"],cor: "Preto",       cores: ["#141419","#7a3b2e"],            badges: [] },
+  { id: "p05", nome: "Conjunto Crochê Marrom",       cat: "conjuntos-praia", cats: ["conjuntos-praia","novidades"],cor: "Verde limão", cores: ["#d8e86a","#f6f4f1"],           badges: ["Novo"] },
+  { id: "p06", nome: "Biquíni Rosa Vibrante",               cat: "tops-praia",    cats: ["tops-praia"],                cor: "Caramelo",    cores: ["#b57a4a","#0f1116"],            badges: [] },
+  { id: "p07", nome: "Biquíni Branco com Saída",     cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Verde água",  cores: ["#9fd8cf","#f6f4f1"],            badges: [] },
+  { id: "p08", nome: "Conjunto Moda Praia",  cat: "conjuntos-praia", cats: ["conjuntos-praia","novidades"],cor: "Laranja",     cores: ["#ef8a4d","#f6f4f1"],           badges: ["Novo"] },
+  { id: "p09", nome: "Biquíni Rosa com Detalhes",    cat: "biquinis",  cats: ["biquinis","novidades"],cor: "Sortido",     cores: ["#f6f4f1","#f4cdd9","#141419"],  badges: ["Novo"] },
+  { id: "p10", nome: "Biquíni Roxo de Amarrar",         cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Laranja",     cores: ["#ef7a3c","#f6f4f1"],            badges: [] },
+  { id: "p11", nome: "Biquíni Vermelho com Chapéu",       cat: "biquinis",  cats: ["biquinis"],              cor: "Azul",        cores: ["#8fb6d9","#f6f4f1"],            badges: [] },
+  { id: "p12", nome: "Maiô Rosa com Saída Branca",       cat: "tops-praia",    cats: ["tops-praia","promocoes"],    cor: "Branco",      cores: ["#f6f4f1","#c9d3e0"],            badges: [] },
   /* p13..p16 foram refeitos: o nome de cada um descreve a peca que esta na foto
      principal (a foto do cartao). Um produto chamado "Short Alfaiataria" com foto
      de vestido branco seria informacao inventada. */
-  { id: "p13", nome: "Short Jeans Branco",         cat: "saidas-praia",     cats: ["saidas-praia","novidades"],   cor: "Branco",      cores: ["#eeebe6","#f2b8cd"],            badges: [] },
-  { id: "p14", nome: "Calça Jeans Wide Leg",       cat: "maios",    cats: ["maios"],                cor: "Jeans",       cores: ["#7d97b5","#f2b8cd"],            badges: [] },
-  { id: "p15", nome: "Conjunto Calça Branca",      cat: "conjuntos-praia", cats: ["conjuntos-praia"],             cor: "Azul e branco", cores: ["#8fb6d9","#f6f4f1"],          badges: [] },
-  { id: "p16", nome: "Vestido Curto Laranja",      cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Laranja",     cores: ["#ef8a4d","#f0e59a"],            badges: [] }
+  { id: "p13", nome: "Saída de Praia Feminina",         cat: "saidas-praia",     cats: ["saidas-praia","novidades"],   cor: "Branco",      cores: ["#eeebe6","#f2b8cd"],            badges: [] },
+  { id: "p14", nome: "Maiô Feminino",       cat: "maios",    cats: ["maios"],                cor: "Jeans",       cores: ["#7d97b5","#f2b8cd"],            badges: [] },
+  { id: "p15", nome: "Conjunto Praia Feminino",      cat: "conjuntos-praia", cats: ["conjuntos-praia"],             cor: "Azul e branco", cores: ["#8fb6d9","#f6f4f1"],          badges: [] },
+  { id: "p16", nome: "Biquíni Feminino",      cat: "biquinis",  cats: ["biquinis","promocoes"],  cor: "Laranja",     cores: ["#ef8a4d","#f0e59a"],            badges: [] }
 ];
 
 /* -------------------------------------------------------- TAMANHOS / CORES */

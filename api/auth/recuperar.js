@@ -32,7 +32,7 @@ const db = require("../_lib/db");
 
 /* A MESMA resposta para todos os casos. Não mude isso sem querer. */
 const RESPOSTA_GENERICA =
-  "Se este e-mail tiver uma conta na La Belle, enviaremos as instruções para " +
+  "Se este e-mail tiver uma conta na Preta Chik, enviaremos as instruções para " +
   "redefinir a senha. Confira também a caixa de spam.";
 
 const VALIDADE_MINUTOS = 60;
