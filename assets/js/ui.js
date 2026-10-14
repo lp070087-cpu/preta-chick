@@ -722,6 +722,17 @@ const LB = (function () {
         gatilhos.forEach(function (g) { g.setAttribute("aria-expanded", "false"); });
       });
       painel.addEventListener("mouseenter", function () { painel.classList.add("aberto"); });
+      function fecharPainel() {
+        painel.classList.remove("aberto");
+        painel.setAttribute("aria-hidden", "true");
+        gatilhos.forEach(function (g) { g.setAttribute("aria-expanded", "false"); });
+      }
+      painel.addEventListener("mouseleave", fecharPainel);
+      window.addEventListener("scroll", fecharPainel, { passive: true });
+      window.addEventListener("resize", fecharPainel);
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") fecharPainel();
+      });
     }
 
     // newsletter
