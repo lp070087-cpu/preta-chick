@@ -361,31 +361,21 @@
   // --- destaques: o restante
   LB.desenharCartoes("#gradeDestaques", PRODUTOS.slice(8, 16));
 
-  // Reels oficiais da Preta Chik
+  // --- reels (links reais do arquivo "link de rels.txt")
   var trilho = document.querySelector("#trilhoReels");
   if (trilho) {
-    var linksReels = [
-      "https://www.instagram.com/p/Dc2B878tsQ9/",
-      "https://www.instagram.com/reel/DcE6C9ypXfI/",
-      "https://www.instagram.com/reel/DIoO3JVRPew/",
-      "https://www.instagram.com/reel/DYrnd-tJKaz/",
-      "https://www.instagram.com/reel/DItnCnnxt6C/",
-      "https://www.instagram.com/reel/DFNV8msxqIm/"
-    ];
-
-    trilho.innerHTML = linksReels.map(function (url, i) {
-      return '<div class="reel reel--instagram">' +
-        '<iframe src="' + url + 'embed/" ' +
-        'title="Publicacao ' + (i + 1) + ' da Preta Chik" ' +
-        'loading="lazy" scrolling="no" ' +
-        'style="width:100%;height:100%;border:0;background:#fff" ' +
-        'allowfullscreen></iframe>' +
-        '<a href="' + url + '" target="_blank" rel="noopener" ' +
-        'style="display:block;padding:.75rem;text-align:center;background:#fff;color:#111;font-size:.75rem">' +
-        'Abrir no Instagram</a>' +
-        '</div>';
+    trilho.innerHTML = REELS.map(function (r, i) {
+      return '<a class="reel rev" style="--atraso:' + (i * 60) + 'ms" href="' + r.url + '" target="_blank" rel="noopener" ' +
+        'aria-label="Abrir o reel ' + LB.escapa(r.titulo) + ' no Instagram">' +
+        '<img src="' + LB.img("reel", r.img.split("/")[1]) + '" alt="' + LB.escapa(r.titulo) + '" loading="lazy" width="480" height="854">' +
+        '<span class="reel__ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.6" cy="6.4" r="1.1" fill="currentColor" stroke="none"/></svg></span>' +
+        '<span class="reel__play"><svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M7 4.5v15l13-7.5z"/></svg></span>' +
+        '<span class="reel__pe"><b>' + LB.escapa(r.titulo) + '</b><span>' + LB.escapa(r.tag) + '</span></span>' +
+        '</a>';
     }).join("");
+    LB.observar(trilho);
   }
+
   // --- monte seu look: troca o look do palco e destaca a peça
   var LOOKS = [
     { id: "p09", foto: "tall/tall-a", rotulo: "Look longo" },

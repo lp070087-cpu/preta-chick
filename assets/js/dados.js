@@ -72,12 +72,44 @@ const TROCAS = [
    Nenhum link ficticio foi criado. O titulo descreve o conteudo
    do destaque, nao um titulo oficial de post.
    ---------------------------------------------------------------- */
+
 const REELS = [
-  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r01", titulo: "Look do dia",     tag: "Novidades" },
-  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r02", titulo: "Prova de looks",  tag: "Loja" },
-  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r03", titulo: "Novo na arara",   tag: "Chegou" },
-  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r04", titulo: "Combinação",      tag: "Monte seu look" },
-  { url: "https://www.instagram.com/pretachik_modapraiaa/", img: "reel/r05", titulo: "Direto da loja",  tag: "Bastidores" }
+  {
+    url: "https://www.instagram.com/p/Dc2B878tsQ9/",
+    img: "reel/r01",
+    titulo: "Look do dia",
+    tag: "Novidades"
+  },
+  {
+    url: "https://www.instagram.com/reel/DcE6C9ypXfI/",
+    img: "reel/r02",
+    titulo: "Prova de looks",
+    tag: "Loja"
+  },
+  {
+    url: "https://www.instagram.com/reel/DIoO3JVRPew/",
+    img: "reel/r03",
+    titulo: "Novo na arara",
+    tag: "Chegou"
+  },
+  {
+    url: "https://www.instagram.com/reel/DYrnd-tJKaz/",
+    img: "reel/r04",
+    titulo: "Combinação",
+    tag: "Monte seu look"
+  },
+  {
+    url: "https://www.instagram.com/reel/DItnCnnxt6C/",
+    img: "reel/r05",
+    titulo: "Direto da loja",
+    tag: "Bastidores"
+  },
+  {
+    url: "https://www.instagram.com/reel/DFNV8msxqIm/",
+    img: "reel/r06",
+    titulo: "Mais da Preta Chik",
+    tag: "Instagram"
+  }
 ];
 
 /* ------------------------------------------------------------- CATEGORIAS */
