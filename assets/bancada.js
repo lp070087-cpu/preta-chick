@@ -153,7 +153,7 @@ ok(naoTroca && naoTroca.lista.length === esperadas.length,
   const html = ler("index.html");
   const bloco = html.split("<!-- ============================ CATEGORIAS")[1] || "";
   const achados = {};
-  for (const m of bloco.matchAll(/href="loja\.html\?cat=([a-z]+)"[\s\S]*?<span>(\d+)\s*pe(?:ça|ca)s?<\/span>/g)) {
+  for (const m of bloco.matchAll(/href="loja\.html\?cat=([a-z-]+)"[\s\S]*?<span>(\d+)\s*pe(?:ça|ca)s?<\/span>/g)) {
     achados[m[1]] = parseInt(m[2], 10);
   }
   const vistos = Object.keys(achados);
@@ -227,7 +227,10 @@ listarHtml().forEach((arq) => {
 /* O numero exato nao e uma meta: a prova util e que TODA pagina do projeto esteja
    alcancavel a partir de alguma outra. Exigir ">= 7" era um limite inventado que
    reprovava o site correto. */
-const paginas = listarHtml().filter((f) => f !== "404.html");
+/* admin.html é o painel interno da loja (exige login de equipe): o acesso
+   público fica só pelo link do rodapé montado em ui.js, que esta varredura
+   de HTML estático não enxerga. */
+const paginas = listarHtml().filter((f) => f !== "404.html" && f !== "admin.html");
 const citadas = new Set(alvosHtml);
 citadas.add("index.html");
 paginas.forEach(function (p) {
@@ -393,8 +396,9 @@ ok(listarJs().indexOf("assets/bancada.js") === -1,
 /* Um gancho de JS so e dispensado se NAO tiver regra propria E se nenhum dos
    seus containers o dimensionar. Aqui: `.cx-ic` nao aparece em seletor
    nenhum do CSS (senao nem precisaria estar na lista). */
-ok(!definidas.has("cx-ic"),
-  "o gancho cx-ic de fato nao tem regra propria no CSS (por isso e dispensado)");
+/* .cx-ic passou a ter regras (ícones dos avisos da área da cliente), então
+   deixou de ser gancho dispensado e entra na conferência normal acima.    */
+ok(definidas.has("cx-ic"), "cx-ic agora tem regra no CSS e é conferido como as demais classes");
 /* E o tamanho dele vem do container, em cada lugar onde ele aparece. Se um
    container perder a regra que dimensiona o svg, ele deixa de ser meramente
    dispensavel e passa a ser defeito — esta prova avisa antes. */

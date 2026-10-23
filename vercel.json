@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/api/loja/(.*)", "destination": "/api/loja?rota=$1" },
+    { "source": "/api/conta/(.*)", "destination": "/api/conta?rota=$1" },
+    { "source": "/api/admin/(.*)", "destination": "/api/admin?rota=$1" }
+  ],
+  "headers": [
+    { "source": "/admin.html", "headers": [
+      { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+      { "key": "X-Frame-Options", "value": "DENY" },
+      { "key": "Referrer-Policy", "value": "same-origin" }
+    ] }
+  ]
+}

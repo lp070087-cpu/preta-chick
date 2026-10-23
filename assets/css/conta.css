@@ -349,3 +349,68 @@ body.tem-conta main { padding-bottom: 5.5rem; }
   .cx-item__preco { text-align: left; width: 100%; }
   .cx-selos { gap: .5rem 1rem; }
 }
+
+/* ================================================ 10. DADOS REAIS
+   Estados de carregamento/erro/vazio, pagamento pendente, origem no
+   atendimento exclusivo e historico do pedido. So classes .cx- novas,
+   com os mesmos tokens do resto da area.                                  */
+.cx-sr {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.cx-selo--alerta { background: #fdf3e3; color: #9a5b12; }
+
+.cx-estado {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .7rem 1rem;
+  padding: 1.1rem 1.25rem; border: 1px solid var(--linha); border-radius: 4px; background: #fff;
+}
+.cx-estado p { flex: 1 1 14rem; font-size: .86rem; color: var(--cinza); line-height: 1.6; }
+.cx-estado svg { width: 17px; height: 17px; color: var(--rosa-forte); flex: 0 0 auto; }
+.cx-estado--erro { border-style: dashed; background: #fcfbfa; }
+.cx-estado--erro p { color: var(--grafite); }
+.cx-estado__giro {
+  width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+  border: 2px solid var(--linha); border-top-color: var(--rosa-forte);
+  animation: cx-giro .9s linear infinite;
+}
+@keyframes cx-giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cx-estado__giro { animation: none; } }
+.cx-estado--vazio { text-align: center; padding: 2.4rem 1.4rem; }
+.cx-estado--vazio p { color: var(--cinza); }
+
+.cx-pagar {
+  display: flex; gap: .8rem; align-items: flex-start;
+  margin-top: 1rem; padding: 1rem 1.15rem;
+  border: 1px solid #f1d9b5; border-radius: 4px; background: #fffaf2;
+}
+.cx-pagar > .cx-ic svg { width: 18px; height: 18px; color: #9a5b12; margin-top: 2px; }
+.cx-pagar > div { flex: 1 1 auto; min-width: 0; }
+.cx-pagar p { font-size: .84rem; color: var(--grafite); line-height: 1.65; }
+.cx-pagar b { font-weight: 500; }
+.cx-pagar--linha { margin: .2rem 0 1rem; }
+.cx-pagar h2.cx-pagar__titulo { font-family: var(--sans); font-weight: 500; line-height: 1.4; font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: #9a5b12; margin-bottom: .6rem; }
+.cx-pagar__lista { display: grid; gap: .55rem; }
+.cx-pagar__lista li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; font-size: .84rem; }
+.cx-pagar__lista li > span:first-child { flex: 1 1 10rem; }
+.cx-pagar__obs { font-size: .76rem; color: var(--cinza); }
+
+.cx-origem { display: flex; align-items: center; gap: .45rem; margin-top: .45rem; font-size: .78rem; color: var(--rosa-escuro); }
+.cx-origem .cx-ic svg { width: 15px; height: 15px; }
+.cx-detalhe__topo + .cx-sub + .cx-origem { margin: -.6rem 0 1rem; }
+.cx-pedido__info .cx-origem span { display: inline; margin: 0; color: inherit; font-size: inherit; }
+
+.cx-aviso .cx-ic svg { width: 16px; height: 16px; color: var(--rosa-forte); }
+.cx-itens--compacto { border: 0; border-radius: 0; border-bottom: 1px solid var(--linha); }
+.cx-itens--compacto .cx-item img { width: 46px; height: 58px; }
+
+.cx-historico { position: relative; display: grid; gap: 0; border: 1px solid var(--linha); border-radius: 4px; padding: 1.1rem 1.25rem; }
+.cx-historico li { display: grid; grid-template-columns: 18px 1fr; gap: .1rem .7rem; position: relative; padding-bottom: 1rem; }
+.cx-historico li:last-child { padding-bottom: 0; }
+.cx-historico li:not(:last-child)::after {
+  content: ""; position: absolute; left: 5px; top: 1.2rem; bottom: 0; width: 1px; background: var(--rosa-claro);
+}
+.cx-historico__pt { width: 11px; height: 11px; border-radius: 50%; background: var(--rosa-forte); margin-top: .35rem; }
+.cx-historico li:last-child .cx-historico__pt { background: var(--rosa); box-shadow: 0 0 0 5px rgba(255, 101, 195, .2); }
+.cx-historico b { display: block; font-weight: 400; font-size: .88rem; color: var(--tinta); }
+.cx-historico time { display: block; font-size: .74rem; color: var(--cinza); margin-top: .15rem; }

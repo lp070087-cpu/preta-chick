@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="same-origin">
+<meta name="theme-color" content="#0f1116">
+<title>Painel · Preta Chik Moda Praia</title>
+<link rel="icon" href="assets/img/logo/preta-chik.jpg">
+<link rel="apple-touch-icon" href="assets/img/logo/preta-chik.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Jost:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body class="adm">
+<a class="pular" href="#conteudo" data-pular>Pular para o conteúdo</a>
+
+<!-- ============================================== abrindo -->
+<div id="tela-carregando" class="tela-cheia" role="status">
+  <img src="assets/img/logo/preta-chik.jpg" alt="" width="72" height="72" class="logo-redondo">
+  <p><span class="girar" aria-hidden="true"></span> Abrindo o painel…</p>
+</div>
+
+<!-- ============================================== entrada / primeiro acesso -->
+<main id="tela-entrada" class="tela-entrada" hidden>
+  <div class="entrada-caixa">
+    <div class="entrada-marca">
+      <img src="assets/img/logo/preta-chik.jpg" alt="" width="64" height="64" class="logo-redondo">
+      <div>
+        <p class="em em--rosa">Preta Chik Moda Praia</p>
+        <h1 class="entrada-titulo">Painel da loja</h1>
+      </div>
+    </div>
+
+    <div id="entrada-alerta" class="faixa faixa--perigo" role="alert" hidden></div>
+
+    <form id="form-login" novalidate>
+      <p class="texto-peq">Acesso restrito à proprietária e às atendentes.</p>
+      <div class="campo">
+        <label class="rotulo" for="login-email">E-mail</label>
+        <input id="login-email" name="email" type="email" class="entrada" autocomplete="username" required>
+      </div>
+      <div class="campo">
+        <label class="rotulo" for="login-senha">Senha</label>
+        <div class="senha-caixa">
+          <input id="login-senha" name="senha" type="password" class="entrada" autocomplete="current-password" required>
+          <button type="button" class="bt-ver-senha" data-ver-senha="login-senha" aria-pressed="false">Mostrar</button>
+        </div>
+      </div>
+      <p class="faixa faixa--perigo erro-geral" role="alert" hidden></p>
+      <button type="submit" class="btn btn--largo">Entrar</button>
+    </form>
+
+    <form id="form-setup" novalidate hidden>
+      <h2 class="entrada-sub">Primeiro acesso</h2>
+      <p class="texto-peq">Ainda não existe nenhuma conta no painel. Crie a conta da proprietária usando o código de configuração (o valor da variável <code>ADMIN_SETUP_TOKEN</code> definida na Vercel).</p>
+      <div class="campo">
+        <label class="rotulo" for="setup-token">Código de configuração</label>
+        <input id="setup-token" name="token" type="password" class="entrada" autocomplete="off" required>
+      </div>
+      <div class="campo">
+        <label class="rotulo" for="setup-nome">Seu nome</label>
+        <input id="setup-nome" name="nome" type="text" class="entrada" autocomplete="name" required>
+      </div>
+      <div class="campo">
+        <label class="rotulo" for="setup-email">E-mail</label>
+        <input id="setup-email" name="email" type="email" class="entrada" autocomplete="username" required>
+      </div>
+      <div class="campo">
+        <label class="rotulo" for="setup-senha">Senha</label>
+        <div class="senha-caixa">
+          <input id="setup-senha" name="senha" type="password" class="entrada" autocomplete="new-password" aria-describedby="setup-senha-ajuda" required>
+          <button type="button" class="bt-ver-senha" data-ver-senha="setup-senha" aria-pressed="false">Mostrar</button>
+        </div>
+        <p class="ajuda" id="setup-senha-ajuda">Mínimo de 10 caracteres, com letras e números.</p>
+      </div>
+      <p class="faixa faixa--perigo erro-geral" role="alert" hidden></p>
+      <button type="submit" class="btn btn--largo">Criar conta da proprietária</button>
+    </form>
+
+    <div id="setup-desativado" class="faixa faixa--alerta" hidden>
+      <p><strong>Primeiro acesso desativado.</strong></p>
+      <p>Ainda não há nenhuma conta no painel, e a criação da conta da proprietária está bloqueada até que a variável de ambiente <code>ADMIN_SETUP_TOKEN</code> seja definida no projeto da Vercel (Settings → Environment Variables). Depois de definir, publique de novo e recarregue esta página.</p>
+    </div>
+
+    <p class="entrada-rodape"><a href="index.html">← Voltar para a loja</a></p>
+  </div>
+</main>
+
+<!-- ============================================== painel -->
+<div id="tela-painel" class="painel" hidden>
+  <header class="topo">
+    <button type="button" id="bt-menu" class="bt-menu" aria-controls="menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span class="so-leitor">Menu</span>
+    </button>
+    <a href="admin.html" class="marca" aria-label="Preta Chik — início do painel">
+      <img src="assets/img/logo/preta-chik.jpg" alt="" width="36" height="36" class="logo-redondo">
+      <span class="marca-texto">Preta Chik <small>Painel</small></span>
+    </a>
+    <div class="topo-usuario">
+      <span class="usuario-info"><span id="usuario-nome"></span> <span id="usuario-papel" class="tag tag--rosa"></span></span>
+      <button type="button" id="bt-sair" class="btn btn--vazio btn--peq">Sair</button>
+    </div>
+  </header>
+
+  <nav id="menu" class="menu" aria-label="Módulos do painel">
+    <ul id="menu-lista"></ul>
+  </nav>
+  <div id="menu-fundo" class="menu-fundo" hidden></div>
+
+  <main id="conteudo" class="conteudo" tabindex="-1"></main>
+</div>
+
+<!-- ============================================== avisos -->
+<div class="avisos">
+  <div id="avisos-educado" aria-live="polite" aria-atomic="false"></div>
+  <div id="avisos-urgente" aria-live="assertive" aria-atomic="false"></div>
+</div>
+
+<!-- ============================================== diálogo -->
+<dialog id="dialogo" class="dialogo" aria-labelledby="dialogo-titulo">
+  <form id="dialogo-form" novalidate>
+    <header class="dialogo-topo">
+      <h2 id="dialogo-titulo"></h2>
+      <button type="button" class="bt-fechar" data-fechar aria-label="Fechar">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div id="dialogo-corpo" class="dialogo-corpo"></div>
+    <p id="dialogo-erro" class="faixa faixa--perigo erro-geral" role="alert" hidden></p>
+    <footer class="dialogo-acoes">
+      <button type="button" class="btn btn--vazio" id="dialogo-cancelar" data-fechar>Cancelar</button>
+      <button type="submit" class="btn" id="dialogo-ok">Confirmar</button>
+    </footer>
+  </form>
+</dialog>
+
+<noscript><p class="faixa faixa--alerta" style="margin:1rem">Ative o JavaScript do navegador para usar o painel.</p></noscript>
+<script src="assets/js/admin.js" defer></script>
+</body>
+</html>

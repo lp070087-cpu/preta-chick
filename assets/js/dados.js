@@ -119,7 +119,7 @@ const REELS = [
    home diria um numero e a loja mostraria outro. */
 const CATEGORIAS = [
   { nome: "Biquínis",  qtd: 7, img: "cat/cat-vestidos",   href: "loja.html?cat=biquinis"  },
-  { nome: "Conjuntos Praia", qtd: 3, img: "cat/cat-conjuntos",  href: "loja.html?cat=conjuntos-praia-praia" },
+  { nome: "Conjuntos Praia", qtd: 3, img: "cat/cat-conjuntos",  href: "loja.html?cat=conjuntos-praia" },
   { nome: "Tops de Praia",    qtd: 4, img: "cat/cat-blusas",     href: "loja.html?cat=tops-praia"    },
   { nome: "Maiôs",    qtd: 1, img: "cat/cat-calcas",     href: "loja.html?cat=maios"    },
   { nome: "Saídas de Praia", qtd: 1, img: "cat/cat-saias", href: "loja.html?cat=saidas-praia"     },
@@ -168,6 +168,13 @@ const PAGAMENTOS = [
 /* ------------------------------------------------------- AJUDA AO RENDER */
 const BASE_IMG = "assets/img/";
 
+/* Foto principal/segunda de uma peça: as 16 originais usam card/<id>-a|b;
+   peças novas cadastradas no painel trazem p.imagens (URLs). */
+function fotoProduto(p, lado) {
+  if (p && p.imagens && p.imagens.length) return p.imagens[lado === "b" && p.imagens[1] ? 1 : 0];
+  return img("card", p.id + "-" + (lado || "a"));
+}
+
 function img(pasta, nome, ext) {
   return BASE_IMG + pasta + "/" + nome + "." + (ext || (pasta === "card" ? "jpg" : "webp"));
 }
@@ -179,6 +186,37 @@ function porCategoria(cat) {
   if (!cat || cat === "todos") return PRODUTOS.slice();
   return PRODUTOS.filter(function (p) { return p.cats.indexOf(cat) > -1; });
 }
-function precoHTML() {
-  return '<span class="consulta">Valor sob consulta</span>';
+/* O preço só aparece quando a loja cadastrou o valor no painel (p.preco,
+   em centavos, vindo de /api/loja/catalogo). Sem isso: "Valor sob consulta". */
+function dinheiro(cents) {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function temPreco(p) { return !!p && typeof p.preco === "number"; }
+function precoHTML(p) {
+  if (!temPreco(p)) return '<span class="consulta">Valor sob consulta</span>';
+  var de = typeof p.precoDe === "number" && p.precoDe > p.preco ? '<s class="preco-de">' + dinheiro(p.precoDe) + "</s> " : "";
+  return de + '<span class="preco">' + dinheiro(p.preco) + "</span>";
+}
+
+/* Situação de um tamanho: "ok" | "esgotado" | "consulta" (estoque não
+   controlado — a loja confirma no atendimento). Antes do catálogo do
+   servidor chegar, vale a lista INDISPONIVEIS acima. */
+function situacaoTamanho(p, tam) {
+  if (p && p.tamanhos) {
+    var t = null;
+    for (var i = 0; i < p.tamanhos.length; i++) if (p.tamanhos[i].tam === tam) t = p.tamanhos[i];
+    if (!t) return "esgotado";
+    if (t.estoque === null) return "consulta";
+    return t.estoque > 0 ? "ok" : "esgotado";
+  }
+  return (INDISPONIVEIS[p && p.id] || []).indexOf(tam) > -1 ? "esgotado" : "consulta";
+}
+function tamanhosDe(p) {
+  if (p && p.tamanhos && p.tamanhos.length) return p.tamanhos.map(function (t) { return t.tam; });
+  return TAMANHOS;
+}
+function esgotado(p) {
+  var ts = tamanhosDe(p);
+  for (var i = 0; i < ts.length; i++) if (situacaoTamanho(p, ts[i]) !== "esgotado") return false;
+  return true;
 }

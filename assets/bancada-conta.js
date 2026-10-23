@@ -623,12 +623,14 @@ const CLIENTE_SERVIDOR = {
        `textContent` tem "são de\nverdade" e o indexOf cru FALHA — foi o que
        aconteceu na primeira rodada. Comparar por espaco normalizado e a
        unica forma de a prova medir a frase, e nao a formatacao do arquivo. */
-    const faixa = doc.body.querySelector(".cx-faixa-aviso");
-    const dizer = (faixa ? faixa.textContent : "").replace(/\s+/g, " ").trim();
-    ok(dizer.indexOf("de exemplo") > -1,
-      "9. a faixa avisa que pedidos e enderecos sao de exemplo", dizer.slice(0, 90));
-    ok(dizer.indexOf("são de verdade") > -1,
-      "10. a mesma faixa diz que a conta e a senha sao de verdade", dizer.slice(0, 90));
+    /* Pedidos e endereços agora vêm de /api/conta (reais). A antiga faixa
+       "são de exemplo" saiu junto com o mock — e nada demonstrativo pode
+       aparecer no lugar dela.                                              */
+    const textoTela = doc.body.textContent.replace(/\s+/g, " ");
+    ok(!doc.body.querySelector(".cx-faixa-aviso") && textoTela.indexOf("de exemplo") === -1,
+      "9. nenhuma faixa ou texto de 'dados de exemplo' na área da cliente");
+    ok(textoTela.indexOf("LB-24960") === -1 && textoTela.indexOf("DEMO") === -1,
+      "10. nenhum pedido ou rastreio fictício do antigo mock aparece");
   }
 
   /* =================================================================== C */
@@ -1209,9 +1211,12 @@ const CLIENTE_SERVIDOR = {
       ok(sabotada.janela.location.href === "login.html",
         "36. CONTROLE NEGATIVO — SEM o portao, login.html NAO sai do lugar",
         "href = " + sabotada.janela.location.href);
-      ok(sabotada.janela.fetch.chamadas.length === 0,
+      /* ui.js busca o catálogo público (/api/loja/catalogo) em toda página;
+         isso não é pergunta de sessão. Conta-se só o que fala de sessão.   */
+      const deSessao = sabotada.janela.fetch.chamadas.filter((c) => /\/api\/(auth|cliente|conta)/.test(c.url));
+      ok(deSessao.length === 0,
         "37. CONTROLE NEGATIVO — SEM o portao, ninguem pergunta ao servidor quem esta conectado",
-        "chamadas = " + sabotada.janela.fetch.chamadas.length);
+        "chamadas de sessao = " + deSessao.length);
 
       /* E se conta-sessao.js nem CARREGAR? A classe anti-piscada ficaria
          presa e o formulario nunca apareceria — pior do que o defeito

@@ -18,11 +18,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Jost:wght@200;300;400;500&display=swap">
-<link rel="preload" as="image" href="assets/img/hero/preta-chik-banner.jpg" fetchpriority="high">
+<link rel="preload" as="image" href="assets/img/passarela/modelo-1.webp" fetchpriority="high">
 
 <link rel="stylesheet" href="assets/css/base.css">
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/paginas.css">
+<link rel="stylesheet" href="assets/css/passarela.css">
 </head>
 <body>
 
@@ -32,39 +33,54 @@
 
 <main id="conteudo">
 
-<!-- ============================ HERO ============================ -->
-<section class="hero">
-  <div class="hero__texto">
-    <p class="hero__selo rev"><span class="em">Nova coleção</span></p>
-
-    <h1 class="t-hero">
-      <span class="sobe-linha" style="--atraso:60ms"><span>Deixando você</span></span>
-      <span class="sobe-linha" style="--atraso:180ms"><span><em>pronta para o verão</em></span></span>
-    </h1>
-
-    <p class="hero__sub rev" style="--atraso:340ms">
-      Moda feminina em Só Verejo, enviando para todo o Brasil. Peças escolhidas uma a uma
-      para o seu dia a dia, para a festa e para o verão.
-    </p>
-
-    <div class="hero__btns rev" style="--atraso:440ms">
-      <a class="bt bt--rosa" href="loja.html?cat=novidades">Ver novidades</a>
-      <a class="bt bt--vazio" href="https://wa.me/5581984023286" target="_blank" rel="noopener">Falar com a loja</a>
+<!-- ============================ PASSARELA ============================
+     Banner editorial: seis looks reais da Preta Chik (fotos com fundo
+     removido). Composição e movimento em assets/css/passarela.css e
+     assets/js/passarela.js. -->
+<section class="passarela" aria-labelledby="passarelaTitulo">
+  <div class="envelope passarela__topo">
+    <div>
+      <p class="passarela__selo"><span class="em">Nova coleção · Olinda/PE</span></p>
+      <h1 id="passarelaTitulo">Verão <em>Preta Chik</em></h1>
     </div>
-
-    <div class="hero__provas rev" style="--atraso:540ms">
-      <div class="hero__prova"><b>45,8 mil</b><span>seguidores no Instagram</span></div>
-      <div class="hero__prova"><b>Todo o Brasil</b><span>envio para a sua casa</span></div>
-      <div class="hero__prova"><b>7 dias</b><span>para troca on-line</span></div>
-    </div>
+    <p class="passarela__sub">Seis looks prontos para o sol. Toque em qualquer modelo da fila para trazê-la à frente e veja as peças de cada look.</p>
   </div>
 
-  <figure class="hero__foto">
-    <img src="assets/img/hero/preta-chik-banner.jpg" alt="Modelo vestindo top halter branco e short jeans da Preta Chik Moda Praia"
-         width="1200" height="1620" fetchpriority="high" decoding="async">
-  </figure>
+  <div class="envelope passarela__grade">
+    <div class="passarela__palco" id="palco" tabindex="0" role="group" aria-roledescription="passarela" aria-label="Passarela de looks. Use as setas do teclado para trocar de look."></div>
+    <aside class="passarela__lado" aria-label="Peças do look">
+      <span class="em em--rosa">Neste look</span>
+      <h2>A peça da modelo</h2>
+      <div id="passarelaPecas" style="display:contents"></div>
+      <p class="passarela__nota">Prefere ajuda para escolher? Na sacola você pode finalizar com atendimento exclusivo pelo WhatsApp.</p>
+    </aside>
+  </div>
 
-  <span class="hero__vertical" aria-hidden="true">Coleção verão · Preta Chik</span>
+  <div class="envelope passarela__controles">
+    <div>
+      <p class="passarela__nome" id="passarelaNome"></p>
+      <div class="passarela__contador" id="passarelaContador"></div>
+      <div class="passarela__segmentos" id="passarelaSegmentos"></div>
+    </div>
+    <div class="passarela__compra">
+      <span class="passarela__pilula"><span id="passarelaCorNome"></span><span class="passarela__cores" id="passarelaCores" aria-hidden="true"></span></span>
+      <a class="passarela__ver" id="passarelaVer" href="loja.html">Ver o look <b id="passarelaPreco">Sob consulta</b></a>
+    </div>
+    <div class="passarela__setas">
+      <button class="passarela__seta" type="button" id="passarelaAnt" aria-label="Look anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18 5 12l6-6"/></svg></button>
+      <button class="passarela__seta" type="button" id="passarelaProx" aria-label="Próximo look"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+  </div>
+  <p class="so-leitor" aria-live="polite" id="passarelaAviso"></p>
+
+  <div class="envelope">
+    <div class="passarela__provas">
+      <div><b>45,8 mil</b><span>seguidores no Instagram</span></div>
+      <div><b>Todo o Brasil</b><span>envio para a sua casa</span></div>
+      <div><b>7 dias</b><span>para troca on-line</span></div>
+      <a class="bt bt--vazio bt--pequeno" href="loja.html?cat=novidades">Ver novidades</a>
+    </div>
+  </div>
 </section>
 
 <!-- ============================ MARQUEE ============================ -->
@@ -348,6 +364,7 @@
 
 <script src="assets/js/dados.js"></script>
 <script src="assets/js/ui.js"></script>
+<script src="assets/js/passarela.js"></script>
 <script>
 (function () {
   LB.iniciar({ pagina: "home" });

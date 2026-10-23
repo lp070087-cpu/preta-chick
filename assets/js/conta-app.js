@@ -13,28 +13,41 @@
       falsa e foi removido. O token da sessao mora num cookie HttpOnly: este
       codigo NAO consegue le-lo, e nada de sessao fica em localStorage.
 
-   2. PEDIDOS e ENDERECOS continuam DEMONSTRATIVOS nesta fase (o escopo da
-      rodada e autenticacao). Eles vem de CONTA_API.DEMO, que e o CONTA_MOCK
-      explicitamente marcado com `ehMock: true`. A faixa no topo da tela diz
-      isso com todas as letras, para ninguem confundir exemplo com pedido
-      de verdade.
+   2. PEDIDOS, ATENDIMENTOS e ENDERECOS tambem sao REAIS: vem de
+      CONTA_API.LOJA (/api/conta/*), com a mesma sessao. Nao existe mais
+      dado de demonstracao nesta tela — se a cliente nao tem pedido, a tela
+      diz que nao tem, em vez de mostrar exemplo.
 
-   Ou seja: o mock nao sustenta mais o acesso — ele so preenche o que ainda
-   nao tem backend. Trocar CONTA_API.DEMO por fetch() completa a area.
+   3. DINHEIRO: a API manda centavos inteiros ou null. null = "sob
+      consulta" (a loja ainda nao cadastrou preco). Esta tela nunca soma,
+      estima ou inventa valor: so formata o que o servidor mandou.
+
+   4. FAVORITOS e SACOLA sao sincronizados com o servidor por
+      conta-sync.js (CONTA_SYNC), iniciado aqui depois que a sessao e
+      confirmada.
    ========================================================================== */
 
 var CONTA_APP = (function () {
 
   "use strict";
 
-  /* ------------------------------------------------------------- estado */
+  /* ------------------------------------------------------------- estado
+     Cada colecao tem tres estados: null = carregando, [] / [..] = pronta,
+     e um erro separado (texto) quando a API falhou.                       */
   var S = {
     cliente: null,
-    pedidos: [],
-    enderecos: [],
-    etapas: [],
+    pedidos: null,
+    erroPedidos: "",
+    statusPedido: {},
+    atendimentos: null,
+    erroAtendimentos: "",
+    statusAtendimento: {},
+    enderecos: null,
+    erroEnderecos: "",
+    detalhes: {},          /* codigo -> { carregando, dados, erro } */
     secao: "visao",
     pedidoAberto: null,
+    enderecoEditando: null,
     /* So vira true depois que o SERVIDOR confirmou a sessao em
        /api/auth/me. Enquanto for false, a area da cliente nao pode ser
        montada nem abrir rota por hash — e o guarda que impede a tela de
@@ -44,8 +57,12 @@ var CONTA_APP = (function () {
 
   var R = {}; /* referencias do DOM */
 
+  /* secoes com formulario: nao sao redesenhadas quando um dado chega em
+     segundo plano, para nao apagar o que a pessoa esta digitando.        */
+  var SECOES_FORM = { endereco: 1, dados: 1, seguranca: 1 };
+
   /* ---------------------------------------------------------- utilitarios */
-  function escapa(t) { return LB.escapa(t); }
+  function escapa(t) { return LB.escapa(t == null ? "" : t); }
 
   function sel(raiz, s) { return (raiz || document).querySelector(s); }
   function todos(raiz, s) { return Array.prototype.slice.call((raiz || document).querySelectorAll(s)); }
@@ -54,62 +71,180 @@ var CONTA_APP = (function () {
     return '<span class="' + (cls || "cx-ic") + '" aria-hidden="true">' + CONTA_UI.svg(nome) + "</span>";
   }
 
-  /* O projeto nao inventa preco: os materiais da Preta Chik nao trazem valor.
-     Onde o site publico escreve "Valor sob consulta", a area do cliente
-     escreve o mesmo — em vez de somar numeros que ninguem informou.        */
-  function valorHTML() {
-    return '<span class="consulta">Valor sob consulta</span>';
+  function msgDe(falha, padrao) {
+    return (falha && (falha.mensagem || falha.message)) || padrao;
   }
 
-  /* Rotulos de status: so nomes para exibir ("Em preparo", "A caminho"...).
-     Nao sao dado de cliente nenhum e nao sustentam acesso — por isso podem
-     continuar vindo do mock sem que o mock vire autenticacao.             */
-  function statusDe(p) { return CONTA_MOCK.STATUS[p.status] || { nome: p.status, tipo: "" }; }
-
-  function seloStatus(p) {
-    var st = statusDe(p);
-    return '<span class="cx-selo cx-selo--' + st.tipo + '">' + escapa(st.nome) + "</span>";
+  /* O projeto nao inventa preco. null = "Valor sob consulta", exatamente o
+     mesmo texto do site publico. Numero = centavos vindos do servidor.    */
+  function dinheiro(cents) {
+    if (cents == null || isNaN(cents)) return '<span class="consulta">Valor sob consulta</span>';
+    var v = (Number(cents) / 100).toFixed(2).split(".");
+    return "R$ " + v[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "," + v[1];
   }
 
-  function qtdItens(p) {
-    return p.itens.reduce(function (s, i) { return s + i.qtd; }, 0);
+  function paraData(iso) {
+    if (!iso) return null;
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function dataCurta(iso) {
+    var d = paraData(iso);
+    if (!d) return CONTA_UI.dataBR(iso);
+    return d.toLocaleDateString("pt-BR");
+  }
+  function dataHora(iso) {
+    var d = paraData(iso);
+    if (!d) return "";
+    return d.toLocaleDateString("pt-BR") + " às " +
+      d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   }
 
-  function resumoPecas(p) {
-    var n = qtdItens(p);
+  /* --------------------------------------------------------- status */
+  function tipoPedido(st) {
+    if (st === "cancelado" || st === "reembolsado") return "cancelado";
+    if (st === "entregue" || st === "concluido") return "ok";
+    if (st === "aguardando_pagamento") return "alerta";
+    return "andamento";
+  }
+  function tipoAtendimento(st) {
+    if (st === "cancelado") return "cancelado";
+    if (st === "concluido") return "ok";
+    if (st === "aguardando_pagamento") return "alerta";
+    return "andamento";
+  }
+  /* nomes de reserva — os oficiais chegam da API junto com cada lista */
+  var NOMES_PEDIDO = {
+    aguardando_pagamento: "Aguardando pagamento", pago: "Pago", em_separacao: "Em separação",
+    enviado: "Enviado", entregue: "Entregue", concluido: "Concluído", cancelado: "Cancelado",
+    reembolsado: "Reembolsado"
+  };
+  var NOMES_ATENDIMENTO = {
+    aguardando_atendimento: "Aguardando atendimento", em_atendimento: "Em atendimento",
+    aguardando_confirmacao: "Aguardando confirmação", aguardando_pagamento: "Aguardando pagamento",
+    pago: "Pago", em_separacao: "Em separação", enviado: "Enviado", concluido: "Concluído",
+    cancelado: "Cancelado"
+  };
+  function nomeStatusPedido(st) { return S.statusPedido[st] || NOMES_PEDIDO[st] || st || "—"; }
+  function nomeStatusAtendimento(st) { return S.statusAtendimento[st] || NOMES_ATENDIMENTO[st] || st || "—"; }
+
+  function seloPedido(p) {
+    return '<span class="cx-selo cx-selo--' + tipoPedido(p.status) + '">' +
+      escapa(p.statusNome || nomeStatusPedido(p.status)) + "</span>";
+  }
+  function seloAtendimento(a) {
+    return '<span class="cx-selo cx-selo--' + tipoAtendimento(a.status) + '">' +
+      escapa(a.statusNome || nomeStatusAtendimento(a.status)) + "</span>";
+  }
+
+  function aguardaPagamento(p) {
+    return p.status === "aguardando_pagamento";
+  }
+  function atendimentoAtivo(a) {
+    return a.status !== "concluido" && a.status !== "cancelado";
+  }
+
+  var PAGAMENTO_NOME = {
+    pendente: "Aguardando pagamento",
+    aprovado: "Pagamento aprovado",
+    estornado: "Pagamento estornado",
+    recusado: "Pagamento recusado"
+  };
+
+  /* --------------------------------------------------------- itens */
+  function itensDe(x) { return (x && x.itens) || []; }
+
+  function qtdItens(x) {
+    return itensDe(x).reduce(function (s, i) { return s + (Number(i.qtd) || 0); }, 0);
+  }
+
+  function resumoPecas(x) {
+    var n = qtdItens(x);
     return n === 1 ? "1 peça" : n + " peças";
   }
 
   /* nomes longos nao podem quebrar o cartao no celular */
-  function tituloItens(p) {
-    var nomes = p.itens.map(function (i) { return i.nome; });
+  function tituloItens(x) {
+    var nomes = itensDe(x).map(function (i) { return i.nome || "Peça"; });
+    if (!nomes.length) return "Sem peças registradas";
     if (nomes.length === 1) return nomes[0];
     if (nomes.length === 2) return nomes[0] + " e " + nomes[1];
     return nomes[0] + " e mais " + (nomes.length - 1) + " peças";
   }
 
-  function enderecoPorId(id) {
-    var achou = null;
-    S.enderecos.forEach(function (e) { if (e.id === id) achou = e; });
-    return achou;
+  function detalheItem(i) {
+    var p = [];
+    if (i.cor) p.push(i.cor);
+    if (i.tam) p.push("Tamanho " + i.tam);
+    p.push("Quantidade " + (i.qtd || 1));
+    return p.join(" · ");
+  }
+
+  /* foto so quando a peca existe no catalogo do site; senao, nada (nao
+     inventamos imagem para peca que o site nao conhece).                 */
+  function fotoItem(i, w, h) {
+    var prod = (typeof buscaProduto === "function" && i && i.id) ? buscaProduto(i.id) : null;
+    if (!prod) return "";
+    return '<img src="' + escapa(LB.img("card", prod.id + "-a")) + '" alt="" width="' + w + '" height="' + h + '" loading="lazy">';
   }
 
   function enderecoLinha(e) {
     if (!e) return "—";
-    var partes = [e.rua + ", " + e.numero];
+    var partes = [(e.rua || "") + (e.numero ? ", " + e.numero : "")];
     if (e.complemento) partes.push(e.complemento);
-    partes.push(e.bairro);
-    partes.push(e.cidade + "/" + e.uf);
-    if (e.cep) partes.push("CEP " + e.cep);
+    if (e.bairro) partes.push(e.bairro);
+    if (e.cidade || e.uf) partes.push((e.cidade || "") + (e.uf ? "/" + e.uf : ""));
+    if (e.cep) partes.push("CEP " + formatarCep(e.cep));
     return partes.join(" · ");
   }
+
+  function formatarCep(c) {
+    var d = CONTA_UI.digitos(c);
+    return d.length === 8 ? d.slice(0, 5) + "-" + d.slice(5) : String(c || "");
+  }
+
+  function enderecoPorId(id) {
+    var achou = null;
+    (S.enderecos || []).forEach(function (e) { if (String(e.id) === String(id)) achou = e; });
+    return achou;
+  }
+
+  /* codigo do atendimento que gerou um pedido (a lista de pedidos nao traz
+     esse codigo; a de atendimentos traz `pedido` quando houve conversao). */
+  function atendimentoDoPedido(codigo) {
+    var achou = null;
+    (S.atendimentos || []).forEach(function (a) { if (a.pedido === codigo) achou = a; });
+    return achou;
+  }
+
+  /* ------------------------------------------- estados de tela (a11y) */
+  function carregandoHTML(texto) {
+    return '<div class="cx-estado" role="status" aria-live="polite">' +
+      '<span class="cx-estado__giro" aria-hidden="true"></span><p>' + escapa(texto) + "</p></div>";
+  }
+  function erroHTML(texto, recarregar) {
+    return '<div class="cx-estado cx-estado--erro" role="alert">' + icone("info") +
+      "<p>" + escapa(texto) + "</p>" +
+      (recarregar ? '<button class="bt bt--vazio bt--pequeno" type="button" data-recarregar="' + escapa(recarregar) + '">Tentar de novo</button>' : "") +
+      "</div>";
+  }
+  function vazioHTML(texto, botao) {
+    return '<div class="cx-cartao cx-estado--vazio">' +
+      "<p>" + texto + "</p>" + (botao || "") + "</div>";
+  }
+
+  function contagem(lista) { return lista === null ? "…" : String(lista.length); }
 
   /* ============================================================ 1. VISAO */
   function secaoVisao() {
     var primeiro = CONTA_UI.primeiroNome(S.cliente.nome);
-    var ativos = S.pedidos.filter(function (p) { return p.status !== "entregue" && p.status !== "cancelado"; });
-    var andamento = ativos.length ? ativos[0] : null;
-    var est = statusDe(andamento || S.pedidos[0] || { status: "" });
+    var pedidos = S.pedidos || [];
+    var atend = S.atendimentos || [];
+    var pendentes = pedidos.filter(aguardaPagamento);
+    var ativosAt = atend.filter(atendimentoAtivo);
+    var abertos = pedidos.filter(function (p) {
+      return ["entregue", "concluido", "cancelado", "reembolsado"].indexOf(p.status) < 0;
+    });
 
     var h = '<section aria-labelledby="t-visao">' +
       '<div class="cx-cabeca">' +
@@ -118,27 +253,48 @@ var CONTA_APP = (function () {
       '</div>';
 
     h += '<div class="cx-grade">';
-    h += '<div class="cx-cartao"><span>Pedidos</span><b>' + S.pedidos.length + '</b>' +
-         '<small>desde ' + escapa(CONTA_UI.dataBR(S.cliente.desde)) + '</small></div>';
-    h += '<div class="cx-cartao"><span>Em andamento</span><b>' + ativos.length + '</b>' +
-         '<small>' + (ativos.length ? "a caminho da sua casa" : "nenhum pedido aberto") + '</small></div>';
-    h += '<div class="cx-cartao"><span>Endereços</span><b>' + S.enderecos.length + '</b>' +
-         '<small>' + (S.enderecos.length ? escapa((S.enderecos.filter(function (e) { return e.principal; })[0] || {}).cidade || "") : "cadastre um endereço") + '</small></div>';
+    h += '<div class="cx-cartao"><span>Pedidos</span><b>' + contagem(S.pedidos) + '</b>' +
+         '<small>' + (S.pedidos === null ? "carregando…" : (abertos.length ? abertos.length + " em andamento" : "nenhum pedido aberto")) + '</small></div>';
+    h += '<div class="cx-cartao"><span>Aguardando pagamento</span><b>' + (S.pedidos === null ? "…" : pendentes.length) + '</b>' +
+         '<small>' + (pendentes.length ? "pedidos com pagamento pendente" : "nenhum pagamento pendente") + '</small></div>';
+    h += '<div class="cx-cartao"><span>Atendimentos ativos</span><b>' + (S.atendimentos === null ? "…" : ativosAt.length) + '</b>' +
+         '<small>' + (ativosAt.length ? "a loja segue pelo WhatsApp" : "nenhum atendimento aberto") + '</small></div>';
+    h += '<div class="cx-cartao"><span>Endereços</span><b>' + contagem(S.enderecos) + '</b>' +
+         '<small>' + ((S.enderecos && S.enderecos.length) ? escapa((S.enderecos.filter(function (e) { return e.principal; })[0] || {}).cidade || "") : "cadastre um endereço") + '</small></div>';
     h += '</div>';
 
-    if (andamento) {
+    if (S.erroPedidos) h += '<div style="margin-top:1rem">' + erroHTML("Não consegui carregar os seus pedidos agora.", "pedidos") + "</div>";
+
+    /* pagamentos pendentes: aviso com atalho direto para pagar */
+    if (pendentes.length) {
+      h += '<div class="cx-pagar" role="region" aria-labelledby="t-pendentes">' + icone("cartao") +
+        '<div><h2 id="t-pendentes" class="cx-pagar__titulo">Pagamentos pendentes</h2><ul class="cx-pagar__lista">';
+      pendentes.forEach(function (p) {
+        h += "<li><span><b>" + escapa(p.codigo) + "</b> · " + dinheiro(p.total) + "</span>" +
+          (p.linkPagamento
+            ? '<a class="bt bt--rosa bt--pequeno" href="' + escapa(p.linkPagamento) + '" target="_blank" rel="noopener">Pagar agora<span class="cx-sr"> o pedido ' + escapa(p.codigo) + ' (abre em nova aba)</span></a>'
+            : '<span class="cx-pagar__obs">a loja envia o link pelo WhatsApp</span>') +
+          '<button class="cx-bt-mini" type="button" data-ir="pedido/' + escapa(p.codigo) + '">Ver pedido</button></li>';
+      });
+      h += "</ul></div></div>";
+    }
+
+    var ultimo = pedidos[0];
+    if (ultimo) {
       h += '<div class="cx-cartao cx-cartao--fita" style="margin-top:1rem">' +
-        '<img src="' + escapa(LB.img("card", andamento.itens[0].foto.split("/")[1])) + '" alt="" width="54" height="68" loading="lazy">' +
-        '<div><span>Último pedido · ' + escapa(andamento.id) + '</span>' +
-        '<b>' + escapa(est.nome) + '</b>' +
-        '<small>' + escapa(resumoPecas(andamento)) + ' · ' + escapa(tituloItens(andamento)) + '</small></div>' +
-        '<button class="bt bt--vazio bt--pequeno" type="button" data-ir="pedido/' + escapa(andamento.id) + '" style="margin-left:auto">Ver pedido</button>' +
+        fotoItem(itensDe(ultimo)[0], 54, 68) +
+        '<div><span>Último pedido · ' + escapa(ultimo.codigo) + '</span>' +
+        '<b>' + escapa(ultimo.statusNome || nomeStatusPedido(ultimo.status)) + '</b>' +
+        '<small>' + escapa(resumoPecas(ultimo)) + ' · ' + escapa(tituloItens(ultimo)) + '</small></div>' +
+        '<button class="bt bt--vazio bt--pequeno" type="button" data-ir="pedido/' + escapa(ultimo.codigo) + '" style="margin-left:auto">Ver pedido</button>' +
         '</div>';
     }
 
     h += '<div class="cx-atalhos">' +
-      atalho("pedidos", "caixa", "Meus pedidos", S.pedidos.length + " no histórico") +
-      atalho("enderecos", "local", "Endereços", S.enderecos.length + " cadastrados") +
+      atalho("pedidos", "caixa", "Meus pedidos", S.pedidos === null ? "carregando…" : pedidos.length + " no histórico") +
+      atalho("atendimentos", "zap", "Atendimentos", S.atendimentos === null ? "carregando…" : (ativosAt.length ? ativosAt.length + " em andamento" : atend.length + " no histórico")) +
+      atalho("enderecos", "pino", "Endereços", S.enderecos === null ? "carregando…" : S.enderecos.length + " cadastrados") +
+      atalho("favoritos", "coracao", "Favoritos", "as peças que você guardou") +
       atalho("dados", "conta", "Meus dados", "nome, e-mail e WhatsApp") +
       atalho("seguranca", "escudo", "Segurança", "alterar a sua senha") +
       '</div>';
@@ -152,6 +308,23 @@ var CONTA_APP = (function () {
       icone(ico) + '<span><b>' + escapa(titulo) + '</b><small>' + escapa(sub) + '</small></span></button>';
   }
 
+  /* bloco "este pedido veio do atendimento exclusivo" */
+  function origemHTML(codigoAt) {
+    return '<p class="cx-origem">' + icone("zap") + "<span>Pedido gerado no atendimento exclusivo" +
+      (codigoAt ? " <b>" + escapa(codigoAt) + "</b>" : " pelo WhatsApp") + "</span></p>";
+  }
+
+  /* aviso de pagamento pendente (lista e detalhe) */
+  function pagamentoPendenteHTML(p) {
+    return '<div class="cx-pagar cx-pagar--linha">' + icone("cartao") +
+      "<div><p><b>Pagamento pendente.</b> " +
+      (p.linkPagamento
+        ? "Assim que o pagamento for confirmado, o pedido segue para separação.</p>" +
+          '<p style="margin-top:.6rem"><a class="bt bt--rosa bt--pequeno" href="' + escapa(p.linkPagamento) + '" target="_blank" rel="noopener">Pagar agora<span class="cx-sr"> (abre em nova aba)</span></a></p>'
+        : "A loja vai enviar o link de pagamento pelo WhatsApp.</p>") +
+      "</div></div>";
+  }
+
   /* ========================================================= 2. PEDIDOS */
   function secaoPedidos() {
     var h = '<section aria-labelledby="t-pedidos">' +
@@ -159,35 +332,41 @@ var CONTA_APP = (function () {
       '<h1 id="t-pedidos" class="cx-titulo">Meus pedidos</h1>' +
       '<p>Toque em um pedido para ver as peças, o pagamento e a entrega.</p></div></div>';
 
+    if (S.pedidos === null && !S.erroPedidos) return h + carregandoHTML("Carregando os seus pedidos…") + "</section>";
+    if (S.erroPedidos) return h + erroHTML(S.erroPedidos, "pedidos") + "</section>";
+
     if (!S.pedidos.length) {
-      h += "<p>Você ainda não fez nenhum pedido na Preta Chik.</p>";
-      h += '<a class="bt bt--rosa" href="loja.html">Ver a loja</a></section>';
-      return h;
+      h += vazioHTML("Você ainda não fez nenhum pedido na Preta Chik.",
+        '<a class="bt bt--rosa" href="loja.html" style="margin-top:1rem">Ver a loja</a>');
+      return h + "</section>";
     }
 
     h += '<div class="cx-pedidos">';
     S.pedidos.forEach(function (p) {
-      var fotos = p.itens.slice(0, 3).map(function (i) {
-        return '<img src="' + escapa(LB.img("card", i.foto.split("/")[1])) + '" alt="" width="54" height="68" loading="lazy">';
-      }).join("");
-      if (p.itens.length > 3) fotos += '<span class="cx-mais">+' + (p.itens.length - 3) + "</span>";
+      var itens = itensDe(p);
+      var fotos = itens.slice(0, 3).map(function (i) { return fotoItem(i, 54, 68); }).join("");
+      if (fotos && itens.length > 3) fotos += '<span class="cx-mais">+' + (itens.length - 3) + "</span>";
+      var at = atendimentoDoPedido(p.codigo);
 
-      h += '<article class="cx-pedido">' +
+      h += '<article class="cx-pedido" aria-labelledby="ped-' + escapa(p.codigo) + '">' +
         '<div class="cx-pedido__topo">' +
-          '<span class="cx-pedido__num">' + escapa(p.id) + '</span>' +
-          '<span class="cx-pedido__data">' + escapa(CONTA_UI.dataBR(p.data)) + '</span>' +
-          seloStatus(p) +
+          '<span class="cx-pedido__num" id="ped-' + escapa(p.codigo) + '">Pedido ' + escapa(p.codigo) + '</span>' +
+          '<span class="cx-pedido__data">' + escapa(dataCurta(p.criadoEm)) + '</span>' +
+          seloPedido(p) +
         '</div>' +
         '<div class="cx-pedido__corpo">' +
-          '<div class="cx-pedido__fotos">' + fotos + '</div>' +
+          (fotos ? '<div class="cx-pedido__fotos">' + fotos + '</div>' : "") +
           '<div class="cx-pedido__info">' +
             '<b>' + escapa(tituloItens(p)) + '</b>' +
-            '<span>' + escapa(resumoPecas(p)) + ' · ' + escapa(CONTA_UI.pagamentoBonito(p.pagamento)) + '</span>' +
+            '<span>' + escapa(resumoPecas(p)) +
+              (p.rastreio ? " · Rastreio " + escapa(p.rastreio) : "") + '</span>' +
+            ((p.canal === "atendimento" || at) ? origemHTML(at ? at.codigo : null) : "") +
           '</div>' +
         '</div>' +
+        (aguardaPagamento(p) ? '<div style="padding:0 1.15rem">' + pagamentoPendenteHTML(p) + "</div>" : "") +
         '<div class="cx-pedido__pe">' +
-          '<span class="cx-pedido__data">' + valorHTML() + '</span>' +
-          '<button class="bt bt--vazio bt--pequeno" type="button" data-ir="pedido/' + escapa(p.id) + '">Ver pedido</button>' +
+          '<span class="cx-pedido__data">Total: ' + dinheiro(p.total) + '</span>' +
+          '<button class="bt bt--vazio bt--pequeno" type="button" data-ir="pedido/' + escapa(p.codigo) + '">Ver pedido<span class="cx-sr"> ' + escapa(p.codigo) + '</span></button>' +
         '</div>' +
       '</article>';
     });
@@ -196,63 +375,141 @@ var CONTA_APP = (function () {
   }
 
   /* ================================================= 3. DETALHE PEDIDO */
-  function secaoPedido(id) {
-    var p = null;
-    S.pedidos.forEach(function (x) { if (x.id === id) p = x; });
-    if (!p) return secaoPedidos();
+  var ETAPAS = [
+    { chave: "aguardando_pagamento", nome: "Aguardando pagamento" },
+    { chave: "pago", nome: "Pagamento confirmado" },
+    { chave: "em_separacao", nome: "Em separação" },
+    { chave: "enviado", nome: "Enviado" },
+    { chave: "entregue", nome: "Entregue" }
+  ];
+  function indiceEtapa(st) {
+    if (st === "concluido") return ETAPAS.length; /* tudo feito */
+    for (var i = 0; i < ETAPAS.length; i++) if (ETAPAS[i].chave === st) return i;
+    return 0;
+  }
 
-    var end = enderecoPorId(p.enderecoId);
-    var cancelado = p.status === "cancelado";
+  function voltarPedidosHTML() {
+    return '<button class="cx-voltar" type="button" data-ir="pedidos">' +
+      '<span class="cx-ic" aria-hidden="true">' + CONTA_UI.svg("setaEsq") + "</span>" +
+      "Voltar para os pedidos</button>";
+  }
 
-    var h = '<section aria-labelledby="t-detalhe">' +
-      '<button class="cx-voltar" type="button" data-ir="pedidos">' +
-        '<span class="cx-ic" aria-hidden="true">' + CONTA_UI.svg("setaEsq") + "</span>" +
-        "Voltar para os pedidos</button>" +
-      '<div class="cx-detalhe__topo">' +
-        '<h2 id="t-detalhe" class="cx-titulo" style="font-size:clamp(1.4rem,3vw,1.95rem)">Pedido ' + escapa(p.id) + '</h2>' +
-        seloStatus(p) +
+  function secaoPedido(codigo) {
+    var det = S.detalhes[codigo];
+    if (!det) { carregarDetalhe(codigo); det = S.detalhes[codigo]; }
+
+    var h = '<section aria-labelledby="t-detalhe">' + voltarPedidosHTML();
+
+    if (det.carregando) {
+      return h + '<h2 id="t-detalhe" class="cx-titulo" style="font-size:clamp(1.4rem,3vw,1.95rem)">Pedido ' + escapa(codigo) + "</h2>" +
+        carregandoHTML("Carregando o pedido…") + "</section>";
+    }
+    if (det.erro) {
+      return h + '<h2 id="t-detalhe" class="cx-titulo" style="font-size:clamp(1.4rem,3vw,1.95rem)">Pedido ' + escapa(codigo) + "</h2>" +
+        erroHTML(det.erro, det.status === 404 ? "" : "pedido") + "</section>";
+    }
+
+    var p = det.dados.pedido || {};
+    var historico = det.dados.historico || [];
+    var cancelado = p.status === "cancelado" || p.status === "reembolsado";
+
+    h += '<div class="cx-detalhe__topo">' +
+        '<h2 id="t-detalhe" class="cx-titulo" style="font-size:clamp(1.4rem,3vw,1.95rem)">Pedido ' + escapa(p.codigo) + '</h2>' +
+        seloPedido(p) +
       '</div>' +
-      '<p class="cx-sub" style="margin-bottom:1.2rem">Feito em ' + escapa(CONTA_UI.dataBR(p.data)) + '</p>';
+      '<p class="cx-sub" style="margin-bottom:1.2rem">Feito em ' + escapa(dataCurta(p.criadoEm)) + '</p>';
 
-    h += cancelado ? avisoCancelado() : linhaDoTempo(p.etapa);
+    if (p.atendimento || p.canal === "atendimento") h += origemHTML(p.atendimento);
+    if (aguardaPagamento(p) || (p.pagamento === "pendente" && p.linkPagamento)) h += pagamentoPendenteHTML(p);
+
+    h += cancelado ? avisoCancelado(p.status) : linhaDoTempo(indiceEtapa(p.status));
 
     h += '<h3 class="cx-bloco" style="border:0;padding:0;margin-bottom:.7rem">Peças do pedido</h3>';
-    h += '<div class="cx-itens">';
-    p.itens.forEach(function (i) {
-      h += '<div class="cx-item">' +
-        '<img src="' + escapa(LB.img("card", i.foto.split("/")[1])) + '" alt="" width="66" height="84" loading="lazy">' +
-        '<div class="cx-item__txt"><b>' + escapa(i.nome) + '</b>' +
-        '<span>Tamanho ' + escapa(i.tam) + ' · Quantidade ' + i.qtd + '</span></div>' +
-        '<div class="cx-item__preco">' + valorHTML() + '</div>' +
-        '</div>';
-    });
-    h += "</div>";
+    var itens = itensDe(p);
+    if (!itens.length) {
+      h += "<p class=\"cx-sub\">Nenhuma peça registrada neste pedido.</p>";
+    } else {
+      h += '<ul class="cx-itens" role="list">';
+      itens.forEach(function (i) {
+        var total = i.total != null ? i.total : null;
+        h += '<li class="cx-item">' + fotoItem(i, 66, 84) +
+          '<div class="cx-item__txt"><b>' + escapa(i.nome || "Peça") + '</b>' +
+          '<span>' + escapa(detalheItem(i)) + '</span>' +
+          (i.preco != null && (i.qtd || 1) > 1 ? "<span>" + dinheiro(i.preco) + " cada</span>" : "") +
+          '</div>' +
+          '<div class="cx-item__preco">' + dinheiro(total != null ? total : (i.preco != null && (i.qtd || 1) === 1 ? i.preco : null)) + '</div>' +
+          '</li>';
+      });
+      h += "</ul>";
+    }
 
-    /* resumo: sem preco real, nenhuma linha soma dinheiro */
-    h += '<div class="cx-resumo">' +
-      '<dl>' +
-        linhaResumo("Subtotal", valorHTML()) +
-        linhaResumo("Frete", escapa(p.frete)) +
-        linhaResumo("Forma de pagamento", escapa(CONTA_UI.pagamentoBonito(p.pagamento))) +
-        '<div class="cx-total"><dt>Total</dt><dd>' + valorHTML() + "</dd></div>" +
+    h += '<div class="cx-resumo"><dl>' +
+        linhaResumo("Subtotal", dinheiro(p.subtotal)) +
+        (p.desconto ? linhaResumo("Desconto", "− " + dinheiro(p.desconto)) : "") +
+        linhaResumo("Frete", p.frete === 0 ? "Grátis" : dinheiro(p.frete)) +
+        '<div class="cx-total"><dt>Total</dt><dd>' + dinheiro(p.total) + "</dd></div>" +
       "</dl></div>";
+
+    var ent = p.entrega;
+    var prazo = ent && ent.prazo != null && ent.prazo !== "" ? (typeof ent.prazo === "number" ? "Prazo: " + ent.prazo + (ent.prazo === 1 ? " dia útil" : " dias úteis") : "Prazo: " + ent.prazo) : "";
 
     h += '<div class="cx-blocos">' +
       '<div class="cx-bloco"><h3>Endereço de entrega</h3>' +
-        (end ? "<p><b>" + escapa(end.destinatario) + "</b><br>" + escapa(enderecoLinha(end)) + "</p>"
-             : "<p>Endereço não informado.</p>") +
+        (p.endereco ? "<p>" + escapa(enderecoLinha(p.endereco)) + "</p>" : "<p>Endereço não informado.</p>") +
       "</div>" +
       '<div class="cx-bloco"><h3>Entrega</h3><p>' +
-        "<b>" + escapa(p.frete) + "</b><br>" + escapa(p.prazo) +
-        (p.rastreio ? '<br><span class="cx-rastreio">Código de rastreio ' + escapa(p.rastreio) + "</span>" : "") +
-      "</p></div>" +
-      '<div class="cx-bloco"><h3>Status atual</h3><p><b>' + escapa(statusDe(p).nome) + "</b></p>" +
+        (ent ? "<b>" + escapa(ent.nome || ent.tipo || "Entrega") + "</b>" + (prazo ? "<br>" + escapa(prazo) : "") : "A combinar com a loja.") +
+        (p.enviadoEm ? "<br>Enviado em " + escapa(dataCurta(p.enviadoEm)) : "") +
+        "</p>" +
+        (p.rastreio ? '<p class="cx-rastreio">Código de rastreio <b>' + escapa(p.rastreio) + "</b></p>" : "") +
+        (p.rastreioUrl ? '<p style="margin-top:.5rem"><a class="lk" href="' + escapa(p.rastreioUrl) + '" target="_blank" rel="noopener">Acompanhar a entrega<span class="cx-sr"> (abre em nova aba)</span></a></p>' : "") +
+      "</div>" +
+      '<div class="cx-bloco"><h3>Pagamento</h3><p><b>' + escapa(PAGAMENTO_NOME[p.pagamento] || p.pagamento || "—") + "</b>" +
+        (p.pagoEm ? "<br>Confirmado em " + escapa(dataCurta(p.pagoEm)) : "") + "</p>" +
         '<p style="margin-top:.5rem"><a class="lk" href="' + escapa(LB.LOJA.whatsapp) + '" target="_blank" rel="noopener">Falar com a loja sobre este pedido</a></p>' +
       "</div>" +
     "</div>";
 
+    h += '<h3 class="cx-bloco" style="border:0;padding:0;margin:1.8rem 0 .7rem">Histórico do pedido</h3>';
+    h += historicoHTML(historico);
+
     h += "</section>";
     return h;
+  }
+
+  function lerDetalhe(d) {
+    if (!d) return {};
+    if (typeof d === "string") { try { return JSON.parse(d) || {}; } catch (e) { return {}; } }
+    return d;
+  }
+
+  function textoEvento(ev) {
+    var d = lerDetalhe(ev.detalhe);
+    if (ev.tipo === "criado") {
+      if (d.canal === "atendimento") return "Pedido criado no atendimento exclusivo" + (d.atendimento ? " " + d.atendimento : "");
+      return "Pedido feito no site";
+    }
+    if (ev.tipo === "status") {
+      var t = "Status: " + nomeStatusPedido(d.para);
+      return t;
+    }
+    if (ev.tipo === "envio") {
+      if (d.rastreio) return "Código de rastreio informado: " + d.rastreio;
+      return "Atualização da entrega" + (d.status ? " (" + d.status + ")" : "");
+    }
+    return "Atualização do pedido";
+  }
+
+  function historicoHTML(lista) {
+    if (!lista.length) return '<p class="cx-sub">Ainda não há movimentações registradas.</p>';
+    var h = '<ol class="cx-historico">';
+    lista.forEach(function (ev) {
+      h += '<li><span class="cx-historico__pt" aria-hidden="true"></span>' +
+        '<div><b>' + escapa(textoEvento(ev)) + "</b>" +
+        (ev.em ? '<time datetime="' + escapa(ev.em) + '">' + escapa(dataHora(ev.em)) + "</time>" : "") +
+        "</div></li>";
+    });
+    return h + "</ol>";
   }
 
   function linhaResumo(rotulo, valor) {
@@ -260,41 +517,104 @@ var CONTA_APP = (function () {
   }
 
   function linhaDoTempo(atual) {
-    var h = '<div class="cx-linha"><div class="cx-linha__trilho">';
-    S.etapas.forEach(function (e, i) {
+    var h = '<div class="cx-linha"><ol class="cx-linha__trilho" aria-label="Andamento do pedido">';
+    ETAPAS.forEach(function (e, i) {
       var cls = i < atual ? "feita" : (i === atual ? "atual" : "");
-      h += '<div class="cx-linha__etapa ' + cls + '">' +
+      h += '<li class="cx-linha__etapa ' + cls + '"' + (i === atual ? ' aria-current="step"' : "") + '>' +
         '<span class="cx-linha__marca" aria-hidden="true"></span>' +
         '<span class="cx-linha__pt" aria-hidden="true"></span>' +
-        '<span class="cx-linha__nome">' + escapa(e.nome) + "</span></div>";
+        '<span class="cx-linha__nome">' + escapa(e.nome) + "</span></li>";
     });
-    h += "</div></div>";
+    h += "</ol></div>";
     return h;
   }
 
-  function avisoCancelado() {
+  function avisoCancelado(st) {
     return '<div class="cx-cancelado">' + icone("info") +
-      "<p><b>Este pedido foi cancelado.</b> Se ficou alguma dúvida sobre o cancelamento ou sobre " +
-      "um possível reembolso, fale direto com a loja pelo WhatsApp — a Preta Chik responde por lá.</p></div>";
+      "<p><b>" + (st === "reembolsado" ? "Este pedido foi reembolsado." : "Este pedido foi cancelado.") + "</b> " +
+      "Se ficou alguma dúvida sobre o cancelamento ou sobre o reembolso, fale direto com a loja pelo " +
+      "WhatsApp — a Preta Chik responde por lá.</p></div>";
   }
 
-  /* ======================================================= 4. ENDERECOS */
+  /* ===================================================== 4. ATENDIMENTOS */
+  function secaoAtendimentos() {
+    var h = '<section aria-labelledby="t-at">' +
+      '<div class="cx-cabeca"><div>' +
+      '<h1 id="t-at" class="cx-titulo">Atendimentos</h1>' +
+      "<p>Os seus pedidos de atendimento exclusivo pelo WhatsApp.</p></div></div>";
+
+    h += '<div class="cx-aviso">' + icone("zap") +
+      "<p><b>Como funciona:</b> quando você pede atendimento exclusivo, a equipe da Preta Chik " +
+      "continua a conversa com você pelo WhatsApp — confirma tamanhos, valores e frete. Aqui você " +
+      "acompanha o andamento e, quando o atendimento vira pedido, encontra o link para ele.</p></div>";
+
+    if (S.atendimentos === null && !S.erroAtendimentos) return h + carregandoHTML("Carregando os seus atendimentos…") + "</section>";
+    if (S.erroAtendimentos) return h + erroHTML(S.erroAtendimentos, "atendimentos") + "</section>";
+
+    if (!S.atendimentos.length) {
+      h += vazioHTML("Você ainda não pediu atendimento exclusivo.",
+        '<a class="bt bt--rosa" href="loja.html" style="margin-top:1rem">Ver a loja</a>');
+      return h + "</section>";
+    }
+
+    h += '<div class="cx-pedidos">';
+    S.atendimentos.forEach(function (a) {
+      var itens = itensDe(a);
+      h += '<article class="cx-pedido" aria-labelledby="at-' + escapa(a.codigo) + '">' +
+        '<div class="cx-pedido__topo">' +
+          '<span class="cx-pedido__num" id="at-' + escapa(a.codigo) + '">Atendimento ' + escapa(a.codigo) + '</span>' +
+          '<span class="cx-pedido__data">' + escapa(dataCurta(a.criadoEm)) + '</span>' +
+          seloAtendimento(a) +
+        '</div>';
+      if (itens.length) {
+        h += '<ul class="cx-itens cx-itens--compacto" role="list">';
+        itens.forEach(function (i) {
+          h += '<li class="cx-item">' + fotoItem(i, 54, 68) +
+            '<div class="cx-item__txt"><b>' + escapa(i.nome || "Peça") + "</b><span>" + escapa(detalheItem(i)) + "</span></div>" +
+            '<div class="cx-item__preco">' + dinheiro(i.preco != null ? i.preco * (Number(i.qtd) || 1) : null) + "</div></li>";
+        });
+        h += "</ul>";
+      }
+      h += '<div class="cx-pedido__pe" style="padding-top:1rem">' +
+          '<span class="cx-pedido__data">Subtotal: ' + dinheiro(a.subtotal) +
+            (a.atualizadoEm ? " · atualizado em " + escapa(dataCurta(a.atualizadoEm)) : "") + "</span>" +
+          (a.pedido
+            ? '<button class="bt bt--vazio bt--pequeno" type="button" data-ir="pedido/' + escapa(a.pedido) + '">Ver pedido ' + escapa(a.pedido) + "</button>"
+            : (atendimentoAtivo(a)
+              ? '<a class="lk" href="' + escapa(LB.LOJA.whatsapp) + '" target="_blank" rel="noopener">Falar com a loja no WhatsApp</a>'
+              : "")) +
+        "</div>" +
+      "</article>";
+    });
+    h += "</div></section>";
+    return h;
+  }
+
+  /* ======================================================= 5. ENDERECOS */
   function secaoEnderecos() {
     var h = '<section aria-labelledby="t-end">' +
       '<div class="cx-cabeca"><div>' +
       '<h1 id="t-end" class="cx-titulo">Endereços</h1>' +
       '<p>O endereço principal é o que vem sugerido nas próximas compras.</p></div></div>';
 
+    if (S.enderecos === null && !S.erroEnderecos) return h + carregandoHTML("Carregando os seus endereços…") + "</section>";
+    if (S.erroEnderecos) return h + erroHTML(S.erroEnderecos, "enderecos") + "</section>";
+
+    if (!S.enderecos.length) {
+      h += '<p class="cx-sub" style="margin-bottom:1rem">Você ainda não cadastrou nenhum endereço.</p>';
+    }
+
     h += '<div class="cx-enderecos">';
     S.enderecos.forEach(function (e) {
+      var nome = e.apelido || "Endereço";
       h += '<article class="cx-endereco' + (e.principal ? " cx-endereco--principal" : "") + '">' +
-        '<div class="cx-endereco__topo"><b>' + escapa(e.rotulo || "Endereço") + "</b>" +
+        '<div class="cx-endereco__topo"><b>' + escapa(nome) + "</b>" +
           (e.principal ? '<span class="cx-tag">Principal</span>' : "") + "</div>" +
-        "<p>" + escapa(e.destinatario) + "<br>" + escapa(enderecoLinha(e)) + "</p>" +
+        "<p>" + escapa(e.destinatario || "") + "<br>" + escapa(enderecoLinha(e)) + "</p>" +
         '<div class="cx-endereco__acoes">' +
-          '<button class="cx-bt-mini" type="button" data-editar="' + escapa(e.id) + '">' + icone("documento") + "Editar</button>" +
-          (e.principal ? "" : '<button class="cx-bt-mini" type="button" data-principal="' + escapa(e.id) + '">' + icone("check") + "Definir principal</button>") +
-          '<button class="cx-bt-mini cx-bt-mini--perigo" type="button" data-excluir="' + escapa(e.id) + '">' + icone("lixo") + "Excluir</button>" +
+          '<button class="cx-bt-mini" type="button" data-editar="' + escapa(e.id) + '" aria-label="Editar o endereço ' + escapa(nome) + '">' + icone("documento") + "Editar</button>" +
+          (e.principal ? "" : '<button class="cx-bt-mini" type="button" data-principal="' + escapa(e.id) + '" aria-label="Definir ' + escapa(nome) + ' como endereço principal">' + icone("check") + "Definir principal</button>") +
+          '<button class="cx-bt-mini cx-bt-mini--perigo" type="button" data-excluir="' + escapa(e.id) + '" aria-label="Excluir o endereço ' + escapa(nome) + '">' + icone("lixo") + "Excluir</button>" +
         "</div></article>";
     });
 
@@ -317,25 +637,27 @@ var CONTA_APP = (function () {
         "Voltar para os endereços</button>" +
       '<h2 id="t-endform" class="cx-titulo" style="font-size:clamp(1.4rem,3vw,1.95rem)">' +
         (e ? "Editar endereço" : "Novo endereço") + "</h2>" +
-      '<p class="cx-sub">Nesta fase os dados de endereço também são de demonstração: nada é enviado para nenhum servidor.</p>' +
+      '<p class="cx-sub">Digite o CEP e nós completamos a rua, o bairro e a cidade quando possível.</p>' +
       '<form class="cx-form" id="formEndereco" novalidate>' +
         '<input type="hidden" name="id" value="' + escapa(v.id || "") + '">' +
         '<div class="cx-form__grade">' +
-          campo("rotulo", "Identificação", v.rotulo, 'placeholder="Casa, Trabalho..."') +
-          campo("destinatario", "Quem recebe", v.destinatario || (S.cliente ? S.cliente.nome : "")) +
-          campo("cep", "CEP", v.cep, 'inputmode="numeric" placeholder="00000-000"') +
-          campo("numero", "Número", v.numero, 'inputmode="numeric"') +
+          campo("apelido", "Identificação", v.apelido, 'maxlength="40" placeholder="Casa, Trabalho..."') +
+          campo("destinatario", "Quem recebe", v.destinatario || (S.cliente ? S.cliente.nome : ""), 'maxlength="120" autocomplete="name" required') +
+          campo("cep", "CEP", v.cep ? formatarCep(v.cep) : "", 'inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000" required') +
+          campo("numero", "Número", v.numero, 'maxlength="20" required') +
         "</div>" +
-        campo("rua", "Rua", v.rua) +
+        '<p class="cx-dica" id="cepStatus" role="status" aria-live="polite" style="margin:-.5rem 0 .9rem"></p>' +
+        campo("rua", "Rua", v.rua, 'maxlength="160" autocomplete="address-line1" required') +
         '<div class="cx-form__grade">' +
-          campo("complemento", "Complemento", v.complemento, 'placeholder="Apto, bloco..."') +
-          campo("bairro", "Bairro", v.bairro) +
-          campo("cidade", "Cidade", v.cidade) +
-          campo("uf", "Estado", v.uf, 'maxlength="2" placeholder="PE"') +
+          campo("complemento", "Complemento", v.complemento, 'maxlength="80" autocomplete="address-line2" placeholder="Apto, bloco..."') +
+          campo("bairro", "Bairro", v.bairro, 'maxlength="80" required') +
+          campo("cidade", "Cidade", v.cidade, 'maxlength="80" autocomplete="address-level2" required') +
+          campo("uf", "Estado (UF)", v.uf, 'maxlength="2" autocomplete="address-level1" placeholder="PE" required') +
         "</div>" +
+        (v.principal ? "" :
         '<label class="escolha" style="margin:.3rem 0 1.3rem">' +
-          '<input type="checkbox" name="principal"' + (v.principal ? " checked" : "") + ">" +
-          "<span>Usar como endereço principal</span></label>" +
+          '<input type="checkbox" name="principal">' +
+          "<span>Usar como endereço principal</span></label>") +
         '<div class="cx-form__acoes">' +
           '<button class="bt bt--rosa" type="submit">' + (e ? "Salvar alterações" : "Adicionar endereço") + "</button>" +
           '<button class="bt bt--vazio" type="button" data-ir="enderecos">Cancelar</button>' +
@@ -343,10 +665,9 @@ var CONTA_APP = (function () {
       "</form></section>";
   }
 
-  /* ======================================================== 5. MEUS DADOS */
+  /* ======================================================== 6. MEUS DADOS */
   function secaoDados(cliente) {
     var c = cliente || S.cliente;
-    var ehForm = !!cliente;
     var inicial = CONTA_UI.iniciais(c.nome);
 
     var h = '<section aria-labelledby="t-dados">' +
@@ -361,7 +682,8 @@ var CONTA_APP = (function () {
         escapa(c.nome) + "</span></b>" +
         '<small>' + escapa(c.email) + "</small></div>" +
       '<div class="cx-cartao"><span>Cliente desde</span><b style="font-size:1.1rem">' + escapa(CONTA_UI.dataBR(c.desde)) + "</b>" +
-        '<small>' + escapa(resumoPecas({ itens: S.pedidos.reduce(function (a, p) { return a.concat(p.itens); }, []) })) + " no total</small></div>" +
+        '<small>' + (S.pedidos === null ? "carregando pedidos…" :
+          escapa(resumoPecas({ itens: S.pedidos.reduce(function (a, p) { return a.concat(itensDe(p)); }, []) })) + " no total") + "</small></div>" +
       "</div>";
 
     /* O e-mail vem do servidor e fica SOMENTE LEITURA nesta fase: trocar o
@@ -389,7 +711,7 @@ var CONTA_APP = (function () {
     return h;
   }
 
-  /* ======================================================= 6. SEGURANCA */
+  /* ======================================================= 7. SEGURANCA */
   function secaoSeguranca() {
     return '<section aria-labelledby="t-seg">' +
       '<div class="cx-cabeca"><div>' +
@@ -425,26 +747,30 @@ var CONTA_APP = (function () {
     "</section>";
   }
 
-  /* ========================================================= 7. FAVORITOS
+  /* ========================================================= 8. FAVORITOS
      Esta secao NAO e nova funcionalidade: o coracao do cabecalho, o aviso
      "Salvo nos favoritos" e os links do rodape e da gaveta ja apontavam para
      conta.html#favoritos. Ela e mantida aqui para esses links continuarem
      funcionando — apagar seria regressao.
-     Reaproveita o motor do site: LB.estado.favoritos e LB.desenharCartoes. */
-  function secaoFavoritos() {
+     Reaproveita o motor do site: LB.estado.favoritos e LB.desenharCartoes.
+     A lista e sincronizada com o servidor por conta-sync.js.              */
+  function listaFavoritos() {
     var ids = (LB.estado && LB.estado.favoritos) || [];
-    var lista = ids.map(function (id) { return buscaProduto(id); })
-                   .filter(function (p) { return !!p; });
+    return ids.map(function (id) { return buscaProduto(id); })
+              .filter(function (p) { return !!p; });
+  }
+
+  function secaoFavoritos() {
+    var lista = listaFavoritos();
 
     var h = '<section aria-labelledby="t-fav">' +
       '<div class="cx-cabeca"><div>' +
       '<h1 id="t-fav" class="cx-titulo">Favoritos</h1>' +
-      '<p>As peças que você guardou tocando no coração.</p></div></div>';
+      '<p>As peças que você guardou tocando no coração. Elas ficam salvas na sua conta.</p></div></div>';
 
     if (!lista.length) {
-      h += '<div class="cx-cartao" style="text-align:center;padding:2.4rem 1.4rem">' +
-        "<p style='color:var(--cinza)'>Você ainda não salvou nenhuma peça.</p>" +
-        '<a class="bt bt--rosa" href="loja.html" style="margin-top:1rem">Ver a loja</a></div>';
+      h += vazioHTML("Você ainda não salvou nenhuma peça.",
+        '<a class="bt bt--rosa" href="loja.html" style="margin-top:1rem">Ver a loja</a>');
       h += "</section>";
       return h;
     }
@@ -453,16 +779,18 @@ var CONTA_APP = (function () {
     return h;
   }
 
-  /* =========================================================== 8. RENDER */
+  /* =========================================================== 9. RENDER */
   var TITULOS = {
-    visao: "Visão geral", pedidos: "Meus pedidos", enderecos: "Endereços",
-    dados: "Meus dados", seguranca: "Segurança", endereco: "Endereço",
-    favoritos: "Favoritos"
+    visao: "Visão geral", pedidos: "Meus pedidos", atendimentos: "Atendimentos",
+    enderecos: "Endereços", dados: "Meus dados", seguranca: "Segurança",
+    endereco: "Endereço", favoritos: "Favoritos"
   };
 
   function render() {
     var h;
     if (S.secao === "pedido") h = secaoPedido(S.pedidoAberto);
+    else if (S.secao === "pedidos") h = secaoPedidos();
+    else if (S.secao === "atendimentos") h = secaoAtendimentos();
     else if (S.secao === "enderecos") h = secaoEnderecos();
     else if (S.secao === "endereco") h = formEndereco(S.enderecoEditando);
     else if (S.secao === "dados") h = secaoDados(null);
@@ -474,16 +802,16 @@ var CONTA_APP = (function () {
 
     /* os favoritos reusam o MESMO cartao de produto do site */
     if (S.secao === "favoritos") {
-      var ids = (LB.estado && LB.estado.favoritos) || [];
-      var lista = ids.map(function (id) { return buscaProduto(id); })
-                     .filter(function (p) { return !!p; });
+      var lista = listaFavoritos();
       if (lista.length) LB.desenharCartoes("#gradeFavoritos", lista);
     }
 
     /* marca a aba ativa (o hash do detalhe pertence a aba de pedidos) */
     var abaMaior = (S.secao === "pedido") ? "pedidos" : (S.secao === "endereco" ? "enderecos" : S.secao);
     todos(R.menu, "button[data-aba]").forEach(function (b) {
-      b.classList.toggle("on", b.getAttribute("data-aba") === abaMaior);
+      var on = b.getAttribute("data-aba") === abaMaior;
+      b.classList.toggle("on", on);
+      if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
 
     ligarAcoes();
@@ -491,13 +819,32 @@ var CONTA_APP = (function () {
     CONTA_UI.pintarIcones(R.caixa);
   }
 
+  /* redesenha quando um dado chega em segundo plano — exceto no meio de um
+     formulario, para nao apagar o que a pessoa esta digitando.           */
+  function renderSeSeguro() {
+    if (!S.entrou || !R.caixa) return;
+    if (SECOES_FORM[S.secao]) return;
+    render();
+  }
+
   /* ------------------------------------------------------- eventos */
   function ligarAcoes() {
-    /* navegacao interna: botao com data-ir="secao" ou "pedido/ID" */
+    /* navegacao interna: botao com data-ir="secao" ou "pedido/CODIGO" */
     todos(R.caixa, "[data-ir]").forEach(function (b) {
       b.addEventListener("click", function () {
-        var destino = b.getAttribute("data-ir");
-        abrirRota(destino);
+        abrirRota(b.getAttribute("data-ir"));
+      });
+    });
+
+    /* tentar de novo depois de um erro */
+    todos(R.caixa, "[data-recarregar]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var o = b.getAttribute("data-recarregar");
+        if (o === "pedidos") carregarPedidos();
+        else if (o === "atendimentos") carregarAtendimentos();
+        else if (o === "enderecos") carregarEnderecos();
+        else if (o === "pedido" && S.pedidoAberto) { delete S.detalhes[S.pedidoAberto]; }
+        render();
       });
     });
 
@@ -509,12 +856,19 @@ var CONTA_APP = (function () {
         S.secao = "endereco";
         render();
         window.scrollTo({ top: 0, behavior: "smooth" });
+        var primeiro = sel(R.caixa, "#formEndereco [name=apelido]");
+        if (primeiro) try { primeiro.focus({ preventScroll: true }); } catch (e) { /* ok */ }
       });
     });
     todos(R.caixa, "[data-principal]").forEach(function (b) {
       b.addEventListener("click", function () {
-        CONTA_API.DEMO.definirPrincipal(b.getAttribute("data-principal")).then(function (lista) {
+        b.disabled = true;
+        CONTA_API.LOJA.definirPrincipal(b.getAttribute("data-principal")).then(function (lista) {
           S.enderecos = lista; render(); toast("Endereço principal atualizado");
+        })["catch"](function (falha) {
+          b.disabled = false;
+          if (falha && falha.status === 401) { sairParaLogin(); return; }
+          toast(msgDe(falha, "Não foi possível atualizar agora."));
         });
       });
     });
@@ -522,14 +876,22 @@ var CONTA_APP = (function () {
       b.addEventListener("click", function () {
         var id = b.getAttribute("data-excluir");
         if (!window.confirm("Excluir este endereço?")) return;
-        CONTA_API.DEMO.excluirEndereco(id).then(function (lista) {
+        b.disabled = true;
+        CONTA_API.LOJA.excluirEndereco(id).then(function (lista) {
           S.enderecos = lista; render(); toast("Endereço excluído");
+        })["catch"](function (falha) {
+          b.disabled = false;
+          if (falha && falha.status === 401) { sairParaLogin(); return; }
+          toast(msgDe(falha, "Não foi possível excluir agora."));
         });
       });
     });
 
     var fe = sel(R.caixa, "#formEndereco");
-    if (fe) fe.addEventListener("submit", submitEndereco);
+    if (fe) {
+      fe.addEventListener("submit", submitEndereco);
+      ligarCep(fe);
+    }
 
     var fd = sel(R.caixa, "#formDados");
     if (fd) fd.addEventListener("submit", submitDados);
@@ -556,6 +918,47 @@ var CONTA_APP = (function () {
 
   function toast(msg) { if (LB.toast) LB.toast(msg); }
 
+  /* ------------------------------------------- CEP: mascara + ViaCEP
+     Opcional e tolerante a falha: se o ViaCEP nao responder, a pessoa
+     preenche a mao e nada quebra. So completa campos; nunca bloqueia.    */
+  function ligarCep(f) {
+    var cep = f.querySelector("[name=cep]");
+    var status = f.querySelector("#cepStatus");
+    var ultimo = "";
+    if (!cep) return;
+
+    cep.addEventListener("input", function () {
+      var d = CONTA_UI.digitos(cep.value).slice(0, 8);
+      var fmt = d.length > 5 ? d.slice(0, 5) + "-" + d.slice(5) : d;
+      if (fmt !== cep.value) cep.value = fmt;
+      if (d.length === 8 && d !== ultimo) { ultimo = d; buscarCep(d); }
+    });
+
+    function buscarCep(d) {
+      if (typeof fetch !== "function") return;
+      if (status) status.textContent = "Buscando o endereço do CEP…";
+      fetch("https://viacep.com.br/ws/" + d + "/json/")
+        .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
+        .then(function (j) {
+          if (!document.body.contains(f)) return;
+          if (!j || j.erro) {
+            if (status) status.textContent = "Não encontramos esse CEP. Confira os números ou preencha o endereço.";
+            return;
+          }
+          [["rua", j.logradouro], ["bairro", j.bairro], ["cidade", j.localidade], ["uf", j.uf]].forEach(function (par) {
+            var el = f.querySelector("[name=" + par[0] + "]");
+            if (el && par[1]) { el.value = par[1]; CONTA_UI.limparErro(el); }
+          });
+          if (status) status.textContent = "Endereço preenchido pelo CEP. Confira e informe o número.";
+          var num = f.querySelector("[name=numero]");
+          if (num && !num.value) try { num.focus(); } catch (e) { /* ok */ }
+        })
+        ["catch"](function () {
+          if (status && document.body.contains(f)) status.textContent = "Não consegui buscar o CEP agora. Preencha o endereço manualmente.";
+        });
+    }
+  }
+
   /* -------------------------------------------------- envio: endereco */
   function submitEndereco(e) {
     e.preventDefault();
@@ -564,34 +967,65 @@ var CONTA_APP = (function () {
 
     var g = function (n) { return f.querySelector("[name=" + n + "]"); };
     var obrig = [
-      { el: g("rua"), msg: "Digite a rua." },
-      { el: g("numero"), msg: "Digite o número." },
-      { el: g("bairro"), msg: "Digite o bairro." },
-      { el: g("cidade"), msg: "Digite a cidade." },
-      { el: g("uf"), msg: "Digite o estado (duas letras)." }
+      { el: g("destinatario"), ok: g("destinatario").value.trim().length >= 3, msg: "Informe quem recebe." },
+      { el: g("cep"), ok: CONTA_UI.digitos(g("cep").value).length === 8, msg: "Digite um CEP com 8 números." },
+      { el: g("numero"), ok: !!g("numero").value.trim(), msg: "Digite o número." },
+      { el: g("rua"), ok: !!g("rua").value.trim(), msg: "Digite a rua." },
+      { el: g("bairro"), ok: !!g("bairro").value.trim(), msg: "Digite o bairro." },
+      { el: g("cidade"), ok: !!g("cidade").value.trim(), msg: "Digite a cidade." },
+      { el: g("uf"), ok: /^[A-Za-z]{2}$/.test(g("uf").value.trim()), msg: "Digite o estado com duas letras." }
     ];
-    obrig.forEach(function (o) { if (!o.el.value.trim()) CONTA_UI.marcarErro(o.el, o.msg); });
+    obrig.forEach(function (o) { if (!o.ok) CONTA_UI.marcarErro(o.el, o.msg); });
     if (CONTA_UI.focarPrimeiroErro(f)) return;
 
+    var id = g("id").value || null;
+    var querPrincipal = !!(g("principal") && g("principal").checked);
     var dados = {
-      id: g("id").value || null,
-      rotulo: g("rotulo").value.trim(),
-      destinatario: g("destinatario").value.trim() || S.cliente.nome,
-      cep: g("cep").value.trim(),
+      apelido: g("apelido").value.trim(),
+      destinatario: g("destinatario").value.trim(),
+      cep: CONTA_UI.digitos(g("cep").value),
       rua: g("rua").value.trim(),
       numero: g("numero").value.trim(),
       complemento: g("complemento").value.trim(),
       bairro: g("bairro").value.trim(),
       cidade: g("cidade").value.trim(),
-      uf: g("uf").value.trim().toUpperCase().slice(0, 2),
-      principal: g("principal").checked
+      uf: g("uf").value.trim().toUpperCase().slice(0, 2)
     };
 
-    CONTA_API.DEMO.salvarEndereco(dados).then(function (lista) {
+    var botao = f.querySelector('button[type="submit"]');
+    var rotulo = botao.textContent;
+    botao.disabled = true;
+    botao.textContent = "Salvando…";
+
+    var antes = (S.enderecos || []).map(function (x) { return String(x.id); });
+    var A = CONTA_API.LOJA;
+    var envio = id ? A.atualizarEndereco(id, dados) : A.criarEndereco(dados);
+
+    envio.then(function (lista) {
+      /* "usar como principal": depois de salvar, marca o endereco certo */
+      var alvo = id;
+      if (!alvo) {
+        var novos = lista.filter(function (x) { return antes.indexOf(String(x.id)) < 0; });
+        alvo = novos.length ? novos[novos.length - 1].id : null;
+      }
+      var atual = null;
+      lista.forEach(function (x) { if (String(x.id) === String(alvo)) atual = x; });
+      if (querPrincipal && atual && !atual.principal) return A.definirPrincipal(alvo);
+      return lista;
+    }).then(function (lista) {
       S.enderecos = lista;
-      S.secao = "enderecos";
-      render();
-      toast(dados.id ? "Endereço atualizado" : "Endereço adicionado");
+      S.erroEnderecos = "";
+      abrirRota("enderecos");
+      toast(id ? "Endereço atualizado" : "Endereço adicionado");
+    })["catch"](function (falha) {
+      botao.disabled = false;
+      botao.textContent = rotulo;
+      if (falha && falha.status === 401) { sairParaLogin(); return; }
+      if (falha && falha.campo) {
+        var alvoEl = g(falha.campo);
+        if (alvoEl) { CONTA_UI.marcarErro(alvoEl, msgDe(falha, "Confira este campo.")); CONTA_UI.focarPrimeiroErro(f); return; }
+      }
+      toast(msgDe(falha, "Não foi possível salvar o endereço agora."));
     });
   }
 
@@ -687,7 +1121,7 @@ var CONTA_APP = (function () {
       });
   }
 
-  /* ==================================================== 8. SESSAO */
+  /* ==================================================== 10. SESSAO */
   function pintarQuem() {
     if (!R.quem) return;
     sel(R.quem, "[data-quem-nome]").textContent = S.cliente ? S.cliente.nome : "Visitante";
@@ -709,14 +1143,17 @@ var CONTA_APP = (function () {
   function sairDaConta() {
     var bt = document.querySelector("#sair");
     if (bt) bt.disabled = true;
+    if (typeof CONTA_SYNC !== "undefined" && CONTA_SYNC.parar) CONTA_SYNC.parar();
 
     CONTA_API.AUTH.sair()
       ["catch"](function () { /* a saida local acontece de qualquer forma */ })
       .then(function () {
         S.entrou = false;
         S.cliente = null;
-        S.pedidos = [];
-        S.enderecos = [];
+        S.pedidos = null;
+        S.atendimentos = null;
+        S.enderecos = null;
+        S.detalhes = {};
         S.secao = "visao";
         if (bt) bt.disabled = false;
         if (R.painel) R.painel.classList.add("oculto");
@@ -727,25 +1164,110 @@ var CONTA_APP = (function () {
       });
   }
 
-  /* roteamento por hash: #visao, #pedidos, #pedido/LB-24960, #enderecos,
-     #endereco/novo, #dados, #seguranca — assim o botao "voltar" do celular
-     funciona e cada tela pode ser linkada direto.                         */
-  function abrirRota(rota) {
+  /* roteamento por hash: #visao, #pedidos, #pedido/PC-XXXXXX, #atendimentos,
+     #enderecos, #endereco, #dados, #seguranca, #favoritos — assim o botao
+     "voltar" do celular funciona e cada tela pode ser linkada direto.     */
+  function aplicarRota(rota) {
     var partes = String(rota || "visao").split("/");
     var alvo = partes[0];
-    if (alvo === "pedido" && partes[1]) { S.secao = "pedido"; S.pedidoAberto = partes[1]; }
-    else if (alvo === "endereco") { S.secao = "endereco"; S.enderecoEditando = null; }
+    if (alvo === "pedido" && partes[1]) { S.secao = "pedido"; S.pedidoAberto = decodeURIComponent(partes[1]); }
+    else if (alvo === "endereco") { S.secao = "endereco"; }
     else S.secao = TITULOS[alvo] ? alvo : "visao";
-    location.hash = "#" + rota;
+  }
+
+  function abrirRota(rota) {
+    var partes = String(rota || "visao").split("/");
+    if (partes[0] === "endereco") S.enderecoEditando = null;
+    /* reabrir um pedido busca o detalhe de novo (status pode ter mudado) */
+    if (partes[0] === "pedido" && partes[1]) delete S.detalhes[partes[1]];
+    aplicarRota(rota);
+    if (location.hash !== "#" + rota) {
+      S.ignorarHash = true;
+      location.hash = "#" + rota;
+    }
     render();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    focarTitulo();
+  }
+
+  /* leva o foco para o titulo da secao nova (leitor de tela anuncia) */
+  function focarTitulo() {
+    var t = sel(R.caixa, "h1, h2");
+    if (!t) return;
+    t.setAttribute("tabindex", "-1");
+    try { t.focus({ preventScroll: true }); } catch (e) { /* ok */ }
   }
 
   function rotaDoHash() {
     return (location.hash || "#visao").replace("#", "");
   }
 
-  /* ========================================================= 9. INICIO */
+  /* =================================================== 11. CARREGAMENTO
+     Cada colecao carrega em paralelo e a tela mostra "carregando" so na
+     parte que falta. 401 em qualquer uma = sessao caiu -> login.         */
+  function falhaCarga(falha, padrao) {
+    if (falha && falha.status === 401) { sairParaLogin(); return null; }
+    return msgDe(falha, padrao);
+  }
+
+  function carregarPedidos() {
+    S.pedidos = null; S.erroPedidos = "";
+    return CONTA_API.LOJA.pedidos().then(function (r) {
+      S.pedidos = r.pedidos;
+      S.statusPedido = r.status || {};
+      renderSeSeguro();
+    })["catch"](function (falha) {
+      var m = falhaCarga(falha, "Não consegui carregar os seus pedidos agora.");
+      if (m === null) return;
+      S.erroPedidos = m;
+      renderSeSeguro();
+    });
+  }
+
+  function carregarAtendimentos() {
+    S.atendimentos = null; S.erroAtendimentos = "";
+    return CONTA_API.LOJA.atendimentos().then(function (r) {
+      S.atendimentos = r.atendimentos;
+      S.statusAtendimento = r.status || {};
+      renderSeSeguro();
+    })["catch"](function (falha) {
+      var m = falhaCarga(falha, "Não consegui carregar os seus atendimentos agora.");
+      if (m === null) return;
+      S.erroAtendimentos = m;
+      renderSeSeguro();
+    });
+  }
+
+  function carregarEnderecos() {
+    S.enderecos = null; S.erroEnderecos = "";
+    return CONTA_API.LOJA.enderecos().then(function (lista) {
+      S.enderecos = lista;
+      renderSeSeguro();
+    })["catch"](function (falha) {
+      var m = falhaCarga(falha, "Não consegui carregar os seus endereços agora.");
+      if (m === null) return;
+      S.erroEnderecos = m;
+      renderSeSeguro();
+    });
+  }
+
+  function carregarDetalhe(codigo) {
+    S.detalhes[codigo] = { carregando: true };
+    CONTA_API.LOJA.pedido(codigo).then(function (r) {
+      S.detalhes[codigo] = { dados: r };
+      if (r.pedido && r.pedido.status && !S.statusPedido[r.pedido.status] && r.pedido.statusNome) {
+        S.statusPedido[r.pedido.status] = r.pedido.statusNome;
+      }
+      if (S.secao === "pedido" && S.pedidoAberto === codigo) render();
+    })["catch"](function (falha) {
+      var m = falhaCarga(falha, "Não consegui carregar este pedido agora.");
+      if (m === null) return;
+      S.detalhes[codigo] = { erro: m, status: falha && falha.status };
+      if (S.secao === "pedido" && S.pedidoAberto === codigo) render();
+    });
+  }
+
+  /* ========================================================= 12. INICIO */
   function iniciar() {
     /* #areaConta, e nao #painel: o ui.js injeta o mega-menu com id="painel"
        na casca do topo, que vem ANTES desta secao. Com o mesmo id, o
@@ -770,14 +1292,16 @@ var CONTA_APP = (function () {
 
     window.addEventListener("hashchange", function () {
       if (!S.entrou) return;   /* sem sessao confirmada, nenhuma rota abre */
-      var r = rotaDoHash();
-      var partes = r.split("/");
-      if (partes[0] === "pedido" && partes[1]) { S.secao = "pedido"; S.pedidoAberto = partes[1]; }
-      else if (partes[0] === "endereco") { S.secao = "endereco"; }
-      else if (partes[0] === "pedidos" && S.secao === "pedido") { S.secao = "pedidos"; }
-      else S.secao = TITULOS[partes[0]] ? partes[0] : S.secao;
+      if (S.ignorarHash) { S.ignorarHash = false; return; }
+      aplicarRota(rotaDoHash());
       render();
     });
+
+    /* favoritos/sacola mudaram (aqui ou depois da sincronizacao): a secao
+       de favoritos se redesenha para refletir a lista nova.              */
+    function talvezFavoritos() { if (S.entrou && S.secao === "favoritos") render(); }
+    document.addEventListener("lb:favoritos", talvezFavoritos);
+    document.addEventListener("conta:sincronizado", talvezFavoritos);
 
     /* QUEM DECIDE SE ESTA TELA ABRE E O SERVIDOR.
        Perguntamos a /api/auth/me. O cookie de sessao (HttpOnly) vai junto
@@ -834,23 +1358,22 @@ var CONTA_APP = (function () {
       });
   }
 
-  /* Dados de pedidos e enderecos: AINDA mock, declarado como mock em
-     CONTA_API.DEMO. O cliente NUNCA vem daqui — quem manda o cliente e o
-     servidor, em /api/auth/me. */
+  /* Depois da sessao confirmada: monta a tela na hora (com "carregando"
+     em cada parte) e busca pedidos, atendimentos e enderecos REAIS em
+     paralelo. Favoritos e sacola sao sincronizados por conta-sync.js.   */
   function carregar() {
-    var A = CONTA_API.DEMO;
-    Promise.all([A.pedidos(), A.enderecos()]).then(function (r) {
-      S.pedidos = r[0];
-      S.enderecos = r[1];
-      S.etapas = CONTA_MOCK.ETAPAS;
-      pintarQuem();
+    pintarQuem();
+    aplicarRota(rotaDoHash());
+    S.pedidos = null; S.atendimentos = null; S.enderecos = null;
+    render();
 
-      var r0 = rotaDoHash().split("/");
-      if (r0[0] === "pedido" && r0[1]) { S.secao = "pedido"; S.pedidoAberto = r0[1]; }
-      else S.secao = TITULOS[r0[0]] ? r0[0] : "visao";
+    carregarPedidos();
+    carregarAtendimentos();
+    carregarEnderecos();
 
-      render();
-    });
+    if (typeof CONTA_SYNC !== "undefined" && CONTA_SYNC.iniciar) {
+      CONTA_SYNC.iniciar({ aoSairDaSessao: sairParaLogin });
+    }
   }
 
   return { iniciar: iniciar, carregar: carregar, estado: S };

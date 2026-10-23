@@ -69,14 +69,13 @@
   document.querySelector("#migalhaLoja").textContent = p.cat;
   document.querySelector("#migalhaLoja").href = "loja.html?cat=" + p.cat;
 
-  var indisponiveis = INDISPONIVEIS[p.id] || [];
-  var seloTam = indisponiveis.indexOf("M") > -1 ? (indisponiveis.indexOf("P") > -1 ? "G" : "P") : "M";
+  var seloTam = null;
   var corEscolhida = p.cor;
   var qtd = 1;
 
   var FOTOS = [
-    { src: LB.img("card", p.id + "-a"), alt: p.nome + " — " + p.cor },
-    { src: LB.img("card", p.id + "-b"), alt: p.nome + " — segunda foto" }
+    { src: fotoProduto(p, "a"), alt: p.nome + " — " + p.cor },
+    { src: fotoProduto(p, "b"), alt: p.nome + " — segunda foto" }
   ];
   var fotoAtual = 0;
 
@@ -106,24 +105,17 @@
     (badges ? '<div class="prod__selos">' + badges + '</div>' : '') +
     '<h1>' + LB.escapa(p.nome) + '</h1>' +
     '<div class="prod__meta">' +
-      '<span class="estrelas" aria-hidden="true">' + Array(6).join('<svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3 6.4 7 .9-5 4.9 1.2 7L12 18l-6.2 3.2L7 11.2 2 6.3l7-.9z"/></svg>') + '</span>' +
       '<span>Peça nova na arara</span>' +
       '<span aria-hidden="true">·</span>' +
       '<span>Cor ' + LB.escapa(p.cor) + '</span>' +
     '</div>' +
 
-    '<div class="prod__preco">' + LB.precoHTML() +
-      '<span class="nota">O valor, o frete e as formas de pagamento são informados pela loja no atendimento.</span>' +
-    '</div>' +
+    '<div class="prod__preco" id="prodPreco"></div>' +
 
     '<div class="prod__grupo">' +
       '<span class="rotulo">Tamanho <a href="trocas.html">Guia e trocas</a></span>' +
-      '<div class="tamanhos" data-tams-produto>' +
-        TAMANHOS.map(function (t) {
-          var off = indisponiveis.indexOf(t) > -1;
-          return '<button type="button" data-tam="' + t + '"' + (off ? " disabled" : "") + (t === seloTam ? ' class="on"' : '') + '>' + t + '</button>';
-        }).join("") +
-      '</div>' +
+      '<div class="tamanhos" data-tams-produto></div>' +
+      '<p class="prod__estoque texto-peq" id="prodEstoque" aria-live="polite"></p>' +
     '</div>' +
 
     '<div class="prod__grupo">' +
@@ -143,6 +135,7 @@
       '</span>' +
       '<button class="bt bt--rosa" type="button" id="addSacola">Adicionar à sacola</button>' +
     '</div>' +
+    '<button class="bt bt--zap bt--largo" type="button" id="comprarAtendimento">' + LB.ICO.zap + '<span>Comprar com atendimento exclusivo</span></button>' +
     '<button class="bt bt--vazio bt--largo" type="button" id="addFavorito">Salvar nos favoritos</button>' +
 
     '<ul class="prod__extra">' +
@@ -155,7 +148,7 @@
       '<div class="acordeao__item">' +
         '<button class="acordeao__bt" type="button" aria-expanded="false">Como comprar<i></i></button>' +
         '<div class="acordeao__painel"><div class="acordeao__dentro">' +
-          '<p class="texto-peq">Escolha o tamanho e a cor, adicione a peça à sacola e finalize. O valor final e o frete são confirmados pela loja pelo WhatsApp, junto com as formas de pagamento.</p>' +
+          '<p class="texto-peq">Escolha o tamanho e a cor e adicione à sacola. Na sacola você escolhe: <strong>finalizar pelo site</strong> (peças com valor e estoque confirmados) ou receber o <strong>atendimento exclusivo pelo WhatsApp</strong>, em que a equipe confere disponibilidade, sugere combinações e fecha o pedido com você.</p>' +
           '<p class="texto-peq"><a class="lk" href="https://wa.me/5581984023286" target="_blank" rel="noopener">Falar com a loja agora</a></p>' +
         '</div></div>' +
       '</div>' +
@@ -170,11 +163,38 @@
       '<div class="acordeao__item">' +
         '<button class="acordeao__bt" type="button" aria-expanded="false">Entrega<i></i></button>' +
         '<div class="acordeao__painel"><div class="acordeao__dentro">' +
-          '<p class="texto-peq">Na sacola você digita o seu CEP e escolhe entre a <strong>entrega local</strong> (combinada direto com a loja) e o envio por <strong>transportadora</strong> para todo o Brasil.</p>' +
+          '<p class="texto-peq">Na sacola você digita o seu CEP e vê as opções: <strong>retirada na loja</strong>, <strong>entrega local</strong> (combinada com a loja) e, quando o cálculo automático estiver ativo, o envio pelos Correios e transportadoras para todo o Brasil.</p>' +
         '</div></div>' +
       '</div>' +
     '</div>' +
   '</div>';
+
+  /* ------------------------------------------- preço e tamanhos reais */
+  function pintarCompra() {
+    var preco = document.querySelector("#prodPreco");
+    preco.innerHTML = LB.precoHTML(p) +
+      '<span class="nota">' + (temPreco(p)
+        ? "Pague pelo site ou finalize com atendimento exclusivo no WhatsApp."
+        : "O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.") + '</span>';
+    var caixa = document.querySelector("[data-tams-produto]");
+    caixa.innerHTML = LB.botoesTamanho(p);
+    var on = caixa.querySelector("button.on");
+    seloTam = on ? on.getAttribute("data-tam") : null;
+    pintarEstoque();
+    var esg = esgotado(p);
+    document.querySelector("#addSacola").disabled = esg;
+    document.querySelector("#addSacola").textContent = esg ? "Esgotado" : "Adicionar à sacola";
+  }
+  function pintarEstoque() {
+    var el = document.querySelector("#prodEstoque");
+    if (!seloTam) { el.textContent = esgotado(p) ? "Todos os tamanhos estão esgotados no momento." : ""; return; }
+    var sit = situacaoTamanho(p, seloTam), qtdEst = null;
+    (p.tamanhos || []).forEach(function (t) { if (t.tam === seloTam) qtdEst = t.estoque; });
+    el.textContent = sit === "ok" ? (qtdEst <= 3 ? "Últimas " + qtdEst + " unidades no tamanho " + seloTam + "." : "Disponível no tamanho " + seloTam + ".")
+      : sit === "consulta" ? "Disponibilidade do tamanho " + seloTam + " confirmada pela loja no atendimento." : "";
+  }
+  pintarCompra();
+  document.addEventListener("lb:catalogo", pintarCompra);
 
   /* --------------------------------------------------------- interacoes */
   function trocarFoto(i) {
@@ -197,6 +217,7 @@
       var bs = grupo.querySelectorAll("button");
       for (var i = 0; i < bs.length; i++) bs[i].classList.remove("on");
       t.classList.add("on"); seloTam = t.getAttribute("data-tam");
+      pintarEstoque();
       return;
     }
 
@@ -204,7 +225,7 @@
     if (c) {
       var g2 = c.parentNode; var bs2 = g2.querySelectorAll("button");
       for (var j = 0; j < bs2.length; j++) bs2[j].classList.remove("on");
-      c.classList.add("on"); corEscolhida = c.getAttribute("data-cor");
+      c.classList.add("on");
     }
   });
 
@@ -215,7 +236,13 @@
     qtd = Math.max(1, qtd - 1); document.querySelector("#qtdValor").textContent = qtd;
   });
   document.querySelector("#addSacola").addEventListener("click", function () {
+    if (!seloTam) { LB.toast("Escolha um tamanho disponível"); return; }
     LB.adicionar(p.id, corEscolhida, seloTam, qtd);
+  });
+  document.querySelector("#comprarAtendimento").addEventListener("click", function () {
+    if (!seloTam) { LB.toast("Escolha um tamanho disponível"); return; }
+    LB.adicionar(p.id, corEscolhida, seloTam, qtd);
+    location.href = "sacola.html#atendimento";
   });
   function pintarBotaoFavorito() {
     var bt = document.querySelector("#addFavorito");

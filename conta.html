@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Minha conta — Preta Chik Moda Praia</title>
-<meta name="description" content="A área da cliente Preta Chik Moda Praia: pedidos, endereços, dados da conta e segurança.">
+<meta name="description" content="A área da cliente Preta Chik Moda Praia: pedidos, atendimentos, endereços, favoritos, dados da conta e segurança.">
 <meta name="theme-color" content="#0f1116">
 <link rel="icon" href="assets/img/logo/preta-chik.jpg">
 <link rel="apple-touch-icon" href="assets/img/logo/preta-chik.jpg">
@@ -111,6 +111,8 @@
               <span data-ico="local" aria-hidden="true"></span> Visão geral</button></li>
             <li><button type="button" data-aba="pedidos">
               <span data-ico="caixa" aria-hidden="true"></span> Meus pedidos</button></li>
+            <li><button type="button" data-aba="atendimentos">
+              <span data-ico="zap" aria-hidden="true"></span> Atendimentos</button></li>
             <li><button type="button" data-aba="favoritos">
               <span data-ico="coracao" aria-hidden="true"></span> Favoritos
               <i data-conta-favoritos>0</i></button></li>
@@ -131,25 +133,13 @@
   </div>
 </main>
 
-<!-- Faixa de aviso da área da cliente: aparece sempre que a área está aberta
-     (body.tem-conta). Diz a verdade sobre o que ainda é exemplo — só os
-     pedidos e os endereços. Os dados da conta e a senha são reais. -->
-<div class="cx-faixa-aviso" role="status">
-  <div class="envelope cx-faixa-aviso__dentro">
-    <span data-ico="info" aria-hidden="true"></span>
-    <p><b>Pedidos e endereços de exemplo.</b> A sua conta, a sua sessão e a sua senha são de
-    verdade — mas o histórico de pedidos e os endereços ainda são dados de demonstração,
-    porque o backend de pedidos não está ligado.</p>
-  </div>
-</div>
-
 <div data-shell-pe></div>
 
 <script src="assets/js/dados.js"></script>
 <script src="assets/js/ui.js"></script>
 <script src="assets/js/conta-ui.js"></script>
-<script src="assets/js/conta-mock.js"></script>
 <script src="assets/js/conta-api.js"></script>
+<script src="assets/js/conta-sync.js"></script>
 <script src="assets/js/conta-app.js"></script>
 <script>
 (function () {

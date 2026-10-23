@@ -13,9 +13,9 @@
       O JavaScript da página NÃO tem acesso ao token da sessão — é o
       navegador que guarda e envia o cookie sozinho.
 
-   2. PEDIDOS e ENDEREÇOS continuam DEMONSTRATIVOS nesta fase (o escopo
-      desta rodada é autenticação). Eles vêm do CONTA_MOCK, continuam
-      claramente marcados como mock, e serão trocados por HTTP depois.
+   2. PEDIDOS, ATENDIMENTOS, ENDEREÇOS, FAVORITOS e SACOLA também são
+      REAIS: vêm de /api/conta/* (namespace LOJA, no fim do arquivo), com
+      a mesma sessão. Não há mais dado de demonstração na área da cliente.
 
    POR QUE O COOKIE VAI COM credentials: "same-origin"
    Sem isso, o navegador não envia o cookie de sessão e toda chamada voltaria
@@ -145,20 +145,66 @@ var CONTA_API = (function () {
     }
   };
 
-  /* ===================================== PEDIDOS/ENDEREÇOS (MOCK, por ora)
-     Marcados como mock DE PROPÓSITO, com `ehMock: true`. Assim fica óbvio no
-     código — e para quem ler depois — que isto ainda não é dado persistido.
-     Quando existir backend de pedidos, basta trocar estas funções por HTTP;
-     a interface não muda.                                                */
-  var DEMO = {
-    ehMock: true,
-    pedidos: function () { return CONTA_MOCK.API.pedidos(); },
-    pedido: function (id) { return CONTA_MOCK.API.pedido(id); },
-    enderecos: function () { return CONTA_MOCK.API.enderecos(); },
-    salvarEndereco: function (e) { return CONTA_MOCK.API.salvarEndereco(e); },
-    excluirEndereco: function (id) { return CONTA_MOCK.API.excluirEndereco(id); },
-    definirPrincipal: function (id) { return CONTA_MOCK.API.definirPrincipal(id); }
+  /* ============================== LOJA: pedidos, atendimentos, endereços,
+     favoritos e sacola (REAL, /api/conta/*)
+     Tudo aqui exige a sessão (cookie HttpOnly). 401 = sessão caiu.
+     Dinheiro vem em centavos inteiros ou null ("sob consulta") — a
+     interface nunca inventa valor. O antigo CONTA_API.DEMO (mock) saiu:
+     nada de demonstração aparece mais na área da cliente.               */
+  function listaEnderecos(r) { return (r.dados && r.dados.enderecos) || []; }
+  function corpoEndereco(e) {
+    return {
+      apelido: e.apelido, destinatario: e.destinatario, cep: e.cep, rua: e.rua,
+      numero: e.numero, complemento: e.complemento, bairro: e.bairro,
+      cidade: e.cidade, uf: e.uf
+    };
+  }
+  function rotaEndereco(id) { return "/conta/enderecos/" + encodeURIComponent(id); }
+
+  var LOJA = {
+    pedidos: function () {
+      return pedir("/conta/pedidos").then(function (r) {
+        return { pedidos: r.dados.pedidos || [], status: r.dados.status || {} };
+      });
+    },
+    pedido: function (codigo) {
+      return pedir("/conta/pedidos/" + encodeURIComponent(codigo)).then(function (r) {
+        return { pedido: r.dados.pedido, historico: r.dados.historico || [] };
+      });
+    },
+    atendimentos: function () {
+      return pedir("/conta/atendimentos").then(function (r) {
+        return { atendimentos: r.dados.atendimentos || [], status: r.dados.status || {} };
+      });
+    },
+    enderecos: function () { return pedir("/conta/enderecos").then(listaEnderecos); },
+    criarEndereco: function (e) {
+      return pedir("/conta/enderecos", { metodo: "POST", corpo: corpoEndereco(e) }).then(listaEnderecos);
+    },
+    atualizarEndereco: function (id, e) {
+      return pedir(rotaEndereco(id), { metodo: "PUT", corpo: corpoEndereco(e) }).then(listaEnderecos);
+    },
+    definirPrincipal: function (id) {
+      return pedir(rotaEndereco(id) + "/principal", { metodo: "POST" }).then(listaEnderecos);
+    },
+    excluirEndereco: function (id) {
+      return pedir(rotaEndereco(id), { metodo: "DELETE" }).then(listaEnderecos);
+    },
+    favoritos: function () {
+      return pedir("/conta/favoritos").then(function (r) { return r.dados.ids || []; });
+    },
+    salvarFavoritos: function (ids) {
+      return pedir("/conta/favoritos", { metodo: "PUT", corpo: { ids: ids } })
+        .then(function (r) { return r.dados.ids || []; });
+    },
+    carrinho: function () {
+      return pedir("/conta/carrinho").then(function (r) { return r.dados.itens || []; });
+    },
+    salvarCarrinho: function (itens) {
+      return pedir("/conta/carrinho", { metodo: "PUT", corpo: { itens: itens } })
+        .then(function (r) { return r.dados.itens || []; });
+    }
   };
 
-  return { AUTH: AUTH, CONTA: CONTA, DEMO: DEMO, pedir: pedir };
+  return { AUTH: AUTH, CONTA: CONTA, LOJA: LOJA, pedir: pedir };
 })();

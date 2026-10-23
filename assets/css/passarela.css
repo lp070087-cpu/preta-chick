@@ -1,0 +1,193 @@
+/* ==========================================================================
+   passarela.css — banner "passarela de modelos" da home
+   Composição inspirada em runway lineup: modelo principal à direita, as
+   demais em fila para a esquerda, menores, com desfoque e transparência
+   crescentes. Usa só os tokens da Preta Chik (base.css).
+   NÃO mexe no cartão de produto (.cartao) nem no hover dele.
+   ========================================================================== */
+
+.passarela {
+  position: relative;
+  padding-top: clamp(1.4rem, 3.4vw, 2.8rem);
+  padding-bottom: clamp(1.6rem, 3vw, 2.4rem);
+  background:
+    radial-gradient(120% 80% at 78% 100%, #fff 0, var(--areia) 42%, var(--areia-2) 100%);
+  overflow: hidden;
+}
+
+.passarela__topo {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem 3rem; flex-wrap: wrap;
+  margin-bottom: clamp(.6rem, 1.6vw, 1.2rem);
+}
+.passarela__selo { display: inline-flex; align-items: center; gap: .7rem; margin-bottom: .6rem; }
+.passarela__selo::before { content: ""; width: 34px; height: 1px; background: var(--rosa); }
+.passarela__selo .em { color: var(--grafite); }
+.passarela h1 {
+  font-family: var(--serif); font-weight: 400; letter-spacing: -.01em;
+  font-size: clamp(2.6rem, 6.4vw, 5.6rem); line-height: .98; margin: 0;
+}
+.passarela h1 em { font-style: italic; color: var(--rosa-forte); }
+.passarela__sub { max-width: 40ch; color: var(--grafite); font-size: clamp(.9rem, 1.2vw, 1rem); line-height: 1.7; margin: 0; }
+
+/* -------------------------------------------------------------- palco */
+.passarela__grade {
+  display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: clamp(1rem, 2vw, 1.8rem); align-items: stretch;
+}
+.passarela__palco {
+  position: relative; height: clamp(440px, 62vh, 640px); overflow: hidden; border-radius: 22px;
+  background:
+    radial-gradient(ellipse 60% 26% at 76% 96%, rgba(255,255,255,.95), transparent 70%),
+    linear-gradient(180deg, #fbf9f7 0%, #f1ece8 62%, #e7e0da 100%);
+  outline: none; touch-action: pan-y; user-select: none; -webkit-user-select: none;
+}
+.passarela__palco:focus-visible { box-shadow: 0 0 0 2px var(--branco), 0 0 0 4px var(--rosa-forte); }
+/* linha do chão */
+.passarela__palco::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 18px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(15,17,22,.08) 20%, rgba(15,17,22,.08) 80%, transparent);
+}
+
+.modelo {
+  position: absolute; bottom: 14px; width: 30%; height: 94%;
+  margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  transform-origin: 50% 100%;
+  transform: translateX(-50%) scale(var(--escala, 1));
+  filter: blur(var(--desfoque, 0));
+  opacity: var(--opacidade, 1);
+  z-index: var(--z, 1);
+  transition:
+    left .9s cubic-bezier(.76, 0, .24, 1),
+    transform .9s cubic-bezier(.76, 0, .24, 1),
+    filter .9s var(--ease), opacity .9s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.modelo:focus-visible { outline: 2px solid var(--rosa-forte); outline-offset: 4px; border-radius: 14px; }
+.modelo__img {
+  position: relative; z-index: 2; display: block; width: 100%; height: 100%;
+  object-fit: contain; object-position: 50% 100%; pointer-events: none;
+  -webkit-user-drag: none;
+}
+/* sombra no chão, sincronizada com o flutuar */
+.modelo__sombra {
+  position: absolute; z-index: 1; left: 50%; bottom: -6px; width: 62%; height: 22px; border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(40,30,22,.32), rgba(40,30,22,0));
+  filter: blur(4px);
+}
+.modelo:not(.modelo--frente):hover {
+  filter: blur(0) !important; opacity: 1 !important;
+  transform: translateX(-50%) translateY(-8px) scale(var(--escala, 1));
+}
+.modelo--frente .modelo__img { animation: pc-flutua 4.8s ease-in-out infinite; }
+.modelo--frente .modelo__sombra { animation: pc-sombra 4.8s ease-in-out infinite; }
+.modelo--frente::after {
+  content: attr(data-acao); position: absolute; z-index: 3; left: 50%; bottom: 8%;
+  transform: translateX(-50%) translateY(6px);
+  font: 500 .62rem/1 var(--sans); letter-spacing: .2em; text-transform: uppercase; white-space: nowrap;
+  background: rgba(255,255,255,.92); color: var(--tinta); padding: .62rem .9rem; border-radius: 40px;
+  box-shadow: var(--sombra-1); opacity: 0; transition: opacity var(--t-rapido), transform var(--t-rapido);
+}
+.modelo--frente:hover::after, .modelo--frente:focus-visible::after { opacity: 1; transform: translateX(-50%); }
+
+@keyframes pc-flutua { 50% { transform: translateY(-10px); } }
+@keyframes pc-sombra { 50% { transform: translateX(-50%) scale(.84); opacity: .7; } }
+
+/* -------------------------------------------------------- lado: peças */
+.passarela__lado { display: flex; flex-direction: column; gap: .8rem; min-width: 0; }
+.passarela__lado h2 { font-family: var(--serif); font-weight: 400; font-size: 1.7rem; margin: 0 0 .1rem; line-height: 1.1; }
+.passarela__peca {
+  display: grid; grid-template-columns: 78px 1fr; gap: .8rem; align-items: center;
+  background: var(--branco); border: 1px solid var(--linha); border-radius: 16px; padding: .5rem;
+  text-align: left; transition: border-color var(--t-rapido), box-shadow var(--t-rapido);
+}
+.passarela__peca:hover { border-color: var(--rosa-claro); box-shadow: var(--sombra-1); }
+.passarela__peca img { width: 78px; height: 96px; object-fit: cover; object-position: 50% 15%; border-radius: 11px; background: var(--areia); }
+.passarela__peca b { display: block; font-family: var(--serif); font-weight: 400; font-size: .95rem; line-height: 1.3; }
+.passarela__peca small { display: block; font-size: .72rem; color: var(--cinza); margin-top: .25rem; }
+.passarela__peca .consulta { font-style: italic; color: var(--rosa-forte); }
+.passarela__peca-acoes { display: flex; gap: .4rem; margin-top: .5rem; flex-wrap: wrap; }
+.passarela__mini {
+  font: 500 .62rem/1 var(--sans); letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid var(--linha); background: var(--branco); color: var(--tinta);
+  border-radius: 30px; padding: .5rem .7rem; cursor: pointer; min-height: 32px;
+}
+.passarela__mini:hover, .passarela__mini:focus-visible { background: var(--tinta); color: #fff; border-color: var(--tinta); }
+.passarela__nota { font-size: .72rem; color: var(--cinza); line-height: 1.55; margin: 0; }
+
+/* ---------------------------------------------------------- controles */
+.passarela__controles {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 1rem 1.6rem; align-items: center;
+  padding-top: clamp(1rem, 2vw, 1.4rem);
+}
+.passarela__nome { font-family: var(--serif); font-size: clamp(1.35rem, 2.2vw, 1.9rem); line-height: 1.15; margin: 0; }
+.passarela__contador { font-size: .7rem; letter-spacing: .18em; color: var(--cinza); margin-top: .25rem; }
+.passarela__segmentos { display: flex; gap: 4px; margin-top: .6rem; }
+.passarela__segmentos button {
+  width: 28px; height: 14px; padding: 0; border: 0; background: none; cursor: pointer; position: relative;
+}
+.passarela__segmentos button::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 6px; height: 2px; background: rgba(15,17,22,.16);
+  transition: background var(--t-rapido);
+}
+.passarela__segmentos button[aria-current="true"]::before { background: var(--tinta); }
+
+.passarela__compra { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; justify-content: center; }
+.passarela__pilula {
+  display: inline-flex; align-items: center; gap: .6rem; min-height: 46px;
+  border: 1px solid var(--linha); background: var(--branco); border-radius: 50px; padding: .5rem 1rem;
+  font-size: .74rem; color: var(--grafite);
+}
+.passarela__cores { display: inline-flex; gap: 6px; }
+.passarela__cores i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(15,17,22,.25); }
+.passarela__ver {
+  display: inline-flex; align-items: center; gap: .9rem; min-height: 46px;
+  background: var(--tinta); color: #fff; border: 1px solid var(--tinta); border-radius: 50px;
+  padding: .45rem .5rem .45rem 1.3rem; font: 500 .7rem/1 var(--sans); letter-spacing: .16em; text-transform: uppercase;
+  transition: background var(--t-rapido);
+}
+.passarela__ver b {
+  background: #fff; color: var(--tinta); border-radius: 30px; padding: .55rem .85rem;
+  font-weight: 500; letter-spacing: .04em; text-transform: none; font-size: .78rem;
+}
+.passarela__ver:hover { background: var(--tinta-2); }
+.passarela__setas { display: flex; gap: .5rem; }
+.passarela__seta {
+  width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--cinza-2); background: transparent;
+  display: grid; place-items: center; cursor: pointer; color: var(--tinta); transition: background var(--t-rapido), color var(--t-rapido);
+}
+.passarela__seta:hover, .passarela__seta:focus-visible { background: var(--tinta); color: #fff; border-color: var(--tinta); }
+.passarela__seta svg { width: 18px; height: 18px; }
+
+.passarela__provas {
+  display: flex; flex-wrap: wrap; gap: .8rem 2.2rem; margin-top: clamp(1.2rem, 2.4vw, 1.8rem);
+  padding-top: clamp(1rem, 2vw, 1.4rem); border-top: 1px solid var(--linha);
+}
+.passarela__provas div b { display: block; font-family: var(--serif); font-weight: 400; font-size: 1.15rem; line-height: 1.2; }
+.passarela__provas div span { font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; color: var(--cinza); }
+.passarela__provas .bt { margin-left: auto; }
+
+/* ---------------------------------------------------------- responsivo */
+@media (max-width: 1080px) {
+  .passarela__grade { grid-template-columns: 1fr; }
+  .passarela__lado { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .7rem; }
+  .passarela__lado h2, .passarela__lado .em, .passarela__nota { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .passarela__controles { grid-template-columns: 1fr auto; }
+  .passarela__compra { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+  .passarela__palco { height: min(500px, 74svh); border-radius: 18px; }
+  .modelo { width: 56%; height: 90%; }
+  .modelo[data-slot="4"], .modelo[data-slot="5"] { opacity: 0 !important; pointer-events: none; }
+  .passarela__compra { flex-direction: column; align-items: stretch; }
+  .passarela__ver { justify-content: space-between; }
+  .passarela__pilula { justify-content: center; }
+  .passarela__provas .bt { margin-left: 0; width: 100%; }
+  .passarela__topo { gap: .6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modelo { transition: none; }
+  .modelo--frente .modelo__img, .modelo--frente .modelo__sombra { animation: none; }
+}

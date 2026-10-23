@@ -217,6 +217,7 @@ const LB = (function () {
           '<a href="https://www.instagram.com/pretachik_modapraiaa/" target="_blank" rel="noopener">@pretachik_modapraiaa</a>' +
           '<a href="trocas.html">Trocas e devoluções</a>' +
           '<a href="login.html">Minha conta</a>' +
+          '<a href="admin.html" rel="nofollow">Painel da loja</a>' +
         '</div>' +
       '</div>' +
     '</div>' +
@@ -276,7 +277,7 @@ const LB = (function () {
       const p = buscaProduto(it.id);
       if (!p) return "";
       return '<div class="item">' +
-        '<div class="item__foto"><div class="midia"><img src="' + img("card", p.id + "-a") + '" alt="' + escapa(p.nome) + '" loading="lazy" width="720" height="900"></div></div>' +
+        '<div class="item__foto"><div class="midia"><img src="' + fotoProduto(p, "a") + '" alt="' + escapa(p.nome) + '" loading="lazy" width="720" height="900"></div></div>' +
         '<div class="item__corpo">' +
           '<h3><a href="produto.html?id=' + p.id + '">' + escapa(p.nome) + '</a></h3>' +
           '<p class="item__atrib">' + escapa(it.cor) + ' · Tam. ' + escapa(it.tam) + '</p>' +
@@ -289,14 +290,15 @@ const LB = (function () {
             '<button class="item__remover" type="button" data-remover="' + escapa(it.k) + '">Remover</button>' +
           '</div>' +
         '</div>' +
-        '<div class="item__preco">' + precoHTML() + '</div>' +
+        '<div class="item__preco">' + (temPreco(p) ? '<span class="preco">' + dinheiro(p.preco * it.qtd) + '</span>' : precoHTML(p)) + '</div>' +
       '</div>';
     }).join("") + '</div>';
 
     if (pe) {
-      pe.innerHTML = '<p class="texto-peq" style="margin-bottom:.9rem">O valor final da sua sacola é confirmado pela loja pelo WhatsApp, junto com o frete.</p>' +
-        '<a class="bt bt--rosa bt--largo" href="sacola.html">Finalizar compra</a>' +
-        '<a class="bt bt--vazio bt--largo" href="loja.html">Continuar comprando</a>';
+      const sub = subtotalCarrinho();
+      pe.innerHTML = (sub !== null ? '<div class="finalizar__sub"><span>Subtotal</span><b>' + dinheiro(sub) + '</b></div>' : '') +
+        finalizarHTML(true) +
+        '<a class="bt bt--vazio bt--largo bt--pequeno" href="loja.html" style="margin-top:.5rem">Continuar comprando</a>';
     }
   }
 
@@ -447,18 +449,15 @@ const LB = (function () {
     const caixa = um("#rapidaCaixa");
     caixa.innerHTML = '' +
       '<button class="icone-bt rapida__fechar" data-fecha="rapida" aria-label="Fechar">' + ICO.fechar + '</button>' +
-      '<div class="rapida__foto"><div class="midia"><img src="' + img("card", p.id + "-a") + '" alt="' + escapa(p.nome) + '" width="720" height="900"></div></div>' +
+      '<div class="rapida__foto"><div class="midia"><img src="' + fotoProduto(p, "a") + '" alt="' + escapa(p.nome) + '" width="720" height="900"></div></div>' +
       '<div class="rapida__info">' +
         '<span class="em em--rosa">' + escapa(p.cat) + '</span>' +
         '<h3 style="margin-top:.5rem">' + escapa(p.nome) + '</h3>' +
-        '<p class="texto-peq" style="margin-bottom:1rem">Cor ' + escapa(p.cor) + ' · ' + TAMANHOS.join(" · ") + '</p>' +
-        '<div class="prod__preco" style="padding-block:.9rem;margin-bottom:1.1rem">' + precoHTML() +
-          '<span class="nota">O valor e as formas de pagamento são informados pela loja.</span></div>' +
+        '<p class="texto-peq" style="margin-bottom:1rem">Cor ' + escapa(p.cor) + ' · ' + tamanhosDe(p).join(" · ") + '</p>' +
+        '<div class="prod__preco" style="padding-block:.9rem;margin-bottom:1.1rem">' + precoHTML(p) +
+          '<span class="nota">' + (temPreco(p) ? 'Pague pelo site ou finalize com atendimento exclusivo no WhatsApp.' : 'O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.') + '</span></div>' +
         '<div class="prod__grupo"><span class="rotulo">Tamanho</span><div class="tamanhos" data-tams="' + p.id + '">' +
-          TAMANHOS.map(function (t) {
-            const off = (INDISPONIVEIS[p.id] || []).indexOf(t) > -1;
-            return '<button type="button" data-tam="' + t + '"' + (off ? " disabled" : "") + (t === "M" && !off ? ' class="on"' : "") + '>' + t + '</button>';
-          }).join("") +
+          botoesTamanho(p) +
         '</div></div>' +
         '<button class="bt bt--rosa bt--largo" type="button" data-add="' + p.id + '">Adicionar à sacola</button>' +
         '<a class="bt bt--vazio bt--largo" href="produto.html?id=' + p.id + '" style="margin-top:.5rem">Ver página da peça</a>' +
@@ -466,19 +465,100 @@ const LB = (function () {
     abrir("rapida");
   }
 
+  /* --------------------------------------------- TAMANHOS E ESTOQUE */
+  function botoesTamanho(p) {
+    const tams = tamanhosDe(p);
+    let escolhido = false;
+    const preferido = situacaoTamanho(p, "M") !== "esgotado" && tams.indexOf("M") > -1 ? "M" : null;
+    return tams.map(function (t) {
+      const off = situacaoTamanho(p, t) === "esgotado";
+      const on = !off && !escolhido && (preferido ? t === preferido : true);
+      if (on) escolhido = true;
+      return '<button type="button" data-tam="' + t + '"' + (off ? ' disabled aria-label="' + t + ' esgotado"' : "") + (on ? ' class="on"' : "") + '>' + t + '</button>';
+    }).join("");
+  }
+  function tamsCartaoHTML(p) {
+    return tamanhosDe(p).map(function (t) {
+      const fora = situacaoTamanho(p, t) === "esgotado";
+      return '<span' + (fora ? ' class="fora" title="Esgotado"' : "") + '>' + t + '</span>';
+    }).join("");
+  }
+  function subtotalCarrinho() {
+    let soma = 0;
+    for (let i = 0; i < estado.carrinho.length; i++) {
+      const p = buscaProduto(estado.carrinho[i].id);
+      if (!temPreco(p)) return null;
+      soma += p.preco * estado.carrinho[i].qtd;
+    }
+    return soma;
+  }
+
+  /* As duas formas de finalizar — na gaveta e na página da sacola. */
+  function finalizarHTML(compacto) {
+    return '<div class="finalizar' + (compacto ? " finalizar--compacto" : "") + '">' +
+      '<p class="finalizar__titulo">Como você prefere finalizar sua compra?</p>' +
+      '<p class="finalizar__texto">Você pode concluir seu pedido diretamente pelo site ou receber nosso atendimento exclusivo pelo WhatsApp. ' +
+      'Nossa equipe ajuda você a escolher suas peças, conferir disponibilidade e encontrar a melhor combinação.</p>' +
+      '<a class="bt bt--rosa bt--largo" href="sacola.html#site" data-finalizar="site">Finalizar pelo site</a>' +
+      '<a class="bt bt--zap bt--largo" href="sacola.html#atendimento" data-finalizar="atendimento">' + ICO.zap + '<span>Receber atendimento exclusivo no WhatsApp</span></a>' +
+    '</div>';
+  }
+
+  /* --------------------------------------------- CATÁLOGO DO SERVIDOR
+     Preço, estoque e peças ativas vêm do banco (/api/loja/catalogo).
+     dados.js continua sendo a base (nomes, fotos) e o plano B: sem
+     servidor, o site segue funcionando com "Valor sob consulta".        */
+  let promessaCatalogo = null;
+  function sincronizarCatalogo() {
+    if (promessaCatalogo) return promessaCatalogo;
+    if (!window.fetch || location.protocol === "file:") return (promessaCatalogo = Promise.resolve(false));
+    promessaCatalogo = fetch("/api/loja/catalogo", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.produtos) return false;
+        d.produtos.forEach(function (s) {
+          let p = buscaProduto(s.id);
+          if (!p) {
+            if (!s.ativo || !s.imagens || !s.imagens.length) return;
+            p = { id: s.id, badges: [] };
+            PRODUTOS.push(p);
+          }
+          p.nome = s.nome; p.cat = s.cat; p.cats = s.cats || p.cats || [s.cat]; p.cor = s.cor || p.cor;
+          p.cores = s.cores && s.cores.length ? s.cores : (p.cores || []);
+          p.badges = s.badges || p.badges || [];
+          p.preco = s.preco; p.precoDe = s.precoDe; p.ativo = s.ativo; p.imagens = s.imagens || [];
+          p.descricao = s.descricao; p.tamanhos = s.tamanhos;
+        });
+        estado.checkout = d.checkout || null;
+        todos("article.cartao[data-id]").forEach(function (a) {
+          const p = buscaProduto(a.getAttribute("data-id"));
+          if (!p) return;
+          const pr = um(".cartao__preco", a); if (pr) pr.innerHTML = precoHTML(p);
+          const tm = um(".cartao__tams", a); if (tm) tm.innerHTML = tamsCartaoHTML(p);
+        });
+        desenharGaveta();
+        document.dispatchEvent(new CustomEvent("lb:catalogo"));
+        return true;
+      })
+      .catch(function () { return false; });
+    return promessaCatalogo;
+  }
+
   /* ------------------------------------------------- CARTÃO DE PRODUTO */
   function cartaoHTML(p, atraso) {
     const favorito = ehFavorito(p.id);
-    const badge = p.badges.length
-      ? '<div class="cartao__selos">' + p.badges.map(function (b) {
-          return '<span class="selo' + (b === "Novo" ? " selo--rosa" : "") + '">' + b + '</span>';
+    const selos = (p.badges || []).slice();
+    if (esgotado(p)) selos.unshift("Esgotado");
+    const badge = selos.length
+      ? '<div class="cartao__selos">' + selos.map(function (b) {
+          return '<span class="selo' + (b === "Novo" ? " selo--rosa" : b === "Esgotado" ? " selo--esgotado" : "") + '">' + b + '</span>';
         }).join("") + '</div>'
       : "";
     return '' +
     '<article class="cartao rev" data-id="' + p.id + '" style="--atraso:' + (atraso || 0) + 'ms">' +
       '<div class="cartao__midia">' +
-        '<img class="cartao__a" src="' + img("card", p.id + "-a") + '" alt="' + escapa(p.nome) + ' — ' + escapa(p.cor) + '" loading="lazy" width="720" height="900">' +
-        '<img class="cartao__b" src="' + img("card", p.id + "-b") + '" alt="" aria-hidden="true" loading="lazy" width="720" height="900">' +
+        '<img class="cartao__a" src="' + fotoProduto(p, "a") + '" alt="' + escapa(p.nome) + ' — ' + escapa(p.cor) + '" loading="lazy" width="720" height="900">' +
+        '<img class="cartao__b" src="' + fotoProduto(p, "b") + '" alt="" aria-hidden="true" loading="lazy" width="720" height="900">' +
         '<span class="cartao__brilho" aria-hidden="true"></span>' +
         badge +
         '<button class="cartao__fav' + (favorito ? " ativo" : "") + '" type="button" data-fav="' + p.id + '" aria-pressed="' + (favorito ? "true" : "false") + '" aria-label="Favoritar ' + escapa(p.nome) + '">' + ICO.coracao + '</button>' +
@@ -487,7 +567,8 @@ const LB = (function () {
       '<div class="cartao__txt">' +
         '<span class="cartao__cat">' + escapa(p.cat) + '</span>' +
         '<h3 class="cartao__nome"><a href="produto.html?id=' + p.id + '">' + escapa(p.nome) + '</a></h3>' +
-        '<div class="cartao__preco">' + precoHTML() + '</div>' +
+        '<div class="cartao__preco">' + precoHTML(p) + '</div>' +
+        '<div class="cartao__tams" aria-label="Tamanhos">' + tamsCartaoHTML(p) + '</div>' +
         '<div class="cartao__cores" aria-hidden="true">' + p.cores.map(function (c) {
           return '<i style="background:' + c + '"></i>';
         }).join("") + '</div>' +
@@ -607,6 +688,7 @@ const LB = (function () {
     refs = montarGavetas();
     atualizarContadores();
     desenharGaveta();
+    sincronizarCatalogo();
 
     // gavetas
     const bm = um("#btMenu");
@@ -641,6 +723,7 @@ const LB = (function () {
         const id = add.getAttribute("data-add");
         const caixaTam = um('[data-tams="' + id + '"]');
         const on = caixaTam ? um("button.on", caixaTam) : null;
+        if (caixaTam && !on) { toast("Escolha um tamanho disponível"); return; }
         adicionar(id, null, on ? on.getAttribute("data-tam") : "M", 1);
       }
 
@@ -784,7 +867,9 @@ const LB = (function () {
     alternarFavorito: alternarFavorito, ehFavorito: ehFavorito,
     estado: estado, escapa: escapa, img: img, precoHTML: precoHTML,
     desenharGaveta: desenharGaveta, atualizarContadores: atualizarContadores,
-    abrirRapida: abrirRapida, buscar: buscar, aberto: function () { return !!(refs && refs.fundo.classList.contains("aberto")); }
+    abrirRapida: abrirRapida, buscar: buscar,
+    catalogo: sincronizarCatalogo, finalizarHTML: finalizarHTML, subtotalCarrinho: subtotalCarrinho,
+    botoesTamanho: botoesTamanho, gravarCarrinho: function () { gravar(CHAVE_CARRINHO, estado.carrinho); }, aberto: function () { return !!(refs && refs.fundo.classList.contains("aberto")); }
   };
 })();
 
