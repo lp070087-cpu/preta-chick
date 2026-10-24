@@ -113,13 +113,17 @@ var CONTA_APP = (function () {
     if (st === "aguardando_pagamento") return "alerta";
     return "andamento";
   }
+  /* Antes da loja confirmar, o pedido do WhatsApp é só uma solicitação —
+     nunca aparece como compra concluída. */
+  var CONFIRMADOS = ["aguardando_pagamento", "pago", "em_separacao", "enviado", "disponivel_retirada", "concluido"];
   /* nomes de reserva — os oficiais chegam da API junto com cada lista */
   var NOMES_PEDIDO = {
     aguardando_pagamento: "Aguardando pagamento", pago: "Pago", em_separacao: "Em separação",
-    enviado: "Enviado", entregue: "Entregue", concluido: "Concluído", cancelado: "Cancelado",
+    enviado: "Enviado", disponivel_retirada: "Disponível para retirada", entregue: "Entregue", concluido: "Concluído", cancelado: "Cancelado",
     reembolsado: "Reembolsado"
   };
   var NOMES_ATENDIMENTO = {
+    solicitacao_criada: "Solicitação criada", disponivel_retirada: "Disponível para retirada",
     aguardando_atendimento: "Aguardando atendimento", em_atendimento: "Em atendimento",
     aguardando_confirmacao: "Aguardando confirmação", aguardando_pagamento: "Aguardando pagamento",
     pago: "Pago", em_separacao: "Em separação", enviado: "Enviado", concluido: "Concluído",
@@ -257,8 +261,8 @@ var CONTA_APP = (function () {
          '<small>' + (S.pedidos === null ? "carregando…" : (abertos.length ? abertos.length + " em andamento" : "nenhum pedido aberto")) + '</small></div>';
     h += '<div class="cx-cartao"><span>Aguardando pagamento</span><b>' + (S.pedidos === null ? "…" : pendentes.length) + '</b>' +
          '<small>' + (pendentes.length ? "pedidos com pagamento pendente" : "nenhum pagamento pendente") + '</small></div>';
-    h += '<div class="cx-cartao"><span>Atendimentos ativos</span><b>' + (S.atendimentos === null ? "…" : ativosAt.length) + '</b>' +
-         '<small>' + (ativosAt.length ? "a loja segue pelo WhatsApp" : "nenhum atendimento aberto") + '</small></div>';
+    h += '<div class="cx-cartao"><span>Pedidos pelo WhatsApp</span><b>' + (S.atendimentos === null ? "…" : ativosAt.length) + '</b>' +
+         '<small>' + (ativosAt.length ? "a loja segue pelo WhatsApp" : "nenhum em andamento") + '</small></div>';
     h += '<div class="cx-cartao"><span>Endereços</span><b>' + contagem(S.enderecos) + '</b>' +
          '<small>' + ((S.enderecos && S.enderecos.length) ? escapa((S.enderecos.filter(function (e) { return e.principal; })[0] || {}).cidade || "") : "cadastre um endereço") + '</small></div>';
     h += '</div>';
@@ -292,7 +296,7 @@ var CONTA_APP = (function () {
 
     h += '<div class="cx-atalhos">' +
       atalho("pedidos", "caixa", "Meus pedidos", S.pedidos === null ? "carregando…" : pedidos.length + " no histórico") +
-      atalho("atendimentos", "zap", "Atendimentos", S.atendimentos === null ? "carregando…" : (ativosAt.length ? ativosAt.length + " em andamento" : atend.length + " no histórico")) +
+      atalho("atendimentos", "zap", "Pedidos pelo WhatsApp", S.atendimentos === null ? "carregando…" : (ativosAt.length ? ativosAt.length + " em andamento" : atend.length + " no histórico")) +
       atalho("enderecos", "pino", "Endereços", S.enderecos === null ? "carregando…" : S.enderecos.length + " cadastrados") +
       atalho("favoritos", "coracao", "Favoritos", "as peças que você guardou") +
       atalho("dados", "conta", "Meus dados", "nome, e-mail e WhatsApp") +
@@ -540,19 +544,19 @@ var CONTA_APP = (function () {
   function secaoAtendimentos() {
     var h = '<section aria-labelledby="t-at">' +
       '<div class="cx-cabeca"><div>' +
-      '<h1 id="t-at" class="cx-titulo">Atendimentos</h1>' +
-      "<p>Os seus pedidos de atendimento exclusivo pelo WhatsApp.</p></div></div>";
+      '<h1 id="t-at" class="cx-titulo">Pedidos pelo WhatsApp</h1>' +
+      "<p>Os pedidos que você montou no site e enviou para a nossa equipe.</p></div></div>";
 
     h += '<div class="cx-aviso">' + icone("zap") +
-      "<p><b>Como funciona:</b> quando você pede atendimento exclusivo, a equipe da Preta Chik " +
-      "continua a conversa com você pelo WhatsApp — confirma tamanhos, valores e frete. Aqui você " +
-      "acompanha o andamento e, quando o atendimento vira pedido, encontra o link para ele.</p></div>";
+      "<p><b>Como funciona:</b> depois que você envia o pedido pelo WhatsApp, a equipe da Preta Chik " +
+      "confere as peças, a disponibilidade, o frete e o total com você. O status abaixo é atualizado pela loja; " +
+      "quando a venda é confirmada, o pedido aparece também em Meus pedidos.</p></div>";
 
     if (S.atendimentos === null && !S.erroAtendimentos) return h + carregandoHTML("Carregando os seus atendimentos…") + "</section>";
     if (S.erroAtendimentos) return h + erroHTML(S.erroAtendimentos, "atendimentos") + "</section>";
 
     if (!S.atendimentos.length) {
-      h += vazioHTML("Você ainda não pediu atendimento exclusivo.",
+      h += vazioHTML("Você ainda não enviou nenhum pedido pelo WhatsApp.",
         '<a class="bt bt--rosa" href="loja.html" style="margin-top:1rem">Ver a loja</a>');
       return h + "</section>";
     }
@@ -562,7 +566,7 @@ var CONTA_APP = (function () {
       var itens = itensDe(a);
       h += '<article class="cx-pedido" aria-labelledby="at-' + escapa(a.codigo) + '">' +
         '<div class="cx-pedido__topo">' +
-          '<span class="cx-pedido__num" id="at-' + escapa(a.codigo) + '">Atendimento ' + escapa(a.codigo) + '</span>' +
+          '<span class="cx-pedido__num" id="at-' + escapa(a.codigo) + '">Pedido #' + escapa(a.codigo) + '</span>' +
           '<span class="cx-pedido__data">' + escapa(dataCurta(a.criadoEm)) + '</span>' +
           seloAtendimento(a) +
         '</div>';
@@ -575,6 +579,12 @@ var CONTA_APP = (function () {
         });
         h += "</ul>";
       }
+      h += '<dl class="cx-at-dados">' +
+          '<div><dt>Entrega</dt><dd>' + escapa(a.entrega ? a.entrega.nome : "—") + (a.endereco ? " · " + escapa(a.endereco.cidade + "/" + a.endereco.uf) : "") + '</dd></div>' +
+          '<div><dt>Frete</dt><dd>' + (a.entrega && a.entrega.tipo === "retirada" ? "sem frete" : (a.frete == null ? "a confirmar" : dinheiro(a.frete))) + '</dd></div>' +
+          '<div><dt>Pagamento preferido</dt><dd>' + escapa(a.pagamentoPreferido || "—") + '</dd></div>' +
+          '<div><dt>Situação</dt><dd>' + (CONFIRMADOS.indexOf(a.status) > -1 ? "Venda confirmada pela loja" : (a.status === "cancelado" ? "Cancelado" : "Aguardando confirmação da loja")) + '</dd></div>' +
+        '</dl>';
       h += '<div class="cx-pedido__pe" style="padding-top:1rem">' +
           '<span class="cx-pedido__data">Subtotal: ' + dinheiro(a.subtotal) +
             (a.atualizadoEm ? " · atualizado em " + escapa(dataCurta(a.atualizadoEm)) : "") + "</span>" +
@@ -781,7 +791,7 @@ var CONTA_APP = (function () {
 
   /* =========================================================== 9. RENDER */
   var TITULOS = {
-    visao: "Visão geral", pedidos: "Meus pedidos", atendimentos: "Atendimentos",
+    visao: "Visão geral", pedidos: "Meus pedidos", atendimentos: "Pedidos pelo WhatsApp",
     enderecos: "Endereços", dados: "Meus dados", seguranca: "Segurança",
     endereco: "Endereço", favoritos: "Favoritos"
   };

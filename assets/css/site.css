@@ -910,3 +910,50 @@ a.beneficio:hover h3 { color: var(--rosa-forte); }
 @media (max-width: 700px) {
   .fin-escolha__opcoes { grid-template-columns: 1fr; }
 }
+
+/* ==========================================================================
+   PEDIDO PELO WHATSAPP — etapas, revisão e envio
+   ========================================================================== */
+.passos-pedido { list-style: none; display: flex; gap: .4rem; padding: 0; margin: 0 0 clamp(1.4rem, 3vw, 2rem); flex-wrap: wrap; }
+.passos-pedido li {
+  display: inline-flex; align-items: center; gap: .5rem; padding: .5rem .9rem; border-radius: 40px;
+  border: 1px solid var(--linha); font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--cinza); background: #fff;
+}
+.passos-pedido li span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--areia); color: var(--grafite); font-size: .7rem; letter-spacing: 0; }
+.passos-pedido li[aria-current="step"] { border-color: var(--tinta); color: var(--tinta); }
+.passos-pedido li[aria-current="step"] span { background: var(--tinta); color: #fff; }
+.passos-pedido li.feito { color: var(--grafite); }
+.passos-pedido li.feito span { background: var(--rosa); color: #fff; }
+
+.passo-pedido { animation: pc-surge .35s var(--ease); }
+@keyframes pc-surge { from { opacity: 0; transform: translateY(8px); } }
+.passo-pedido .frete__cep { max-width: 520px; }
+.passo-pedido__acoes { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: flex-end; margin-top: 1.4rem; padding-top: 1.2rem; border-top: 1px solid var(--linha); }
+.passo-pedido__acoes .bt { min-width: 180px; }
+
+.revisao { display: grid; gap: .9rem; }
+.revisao__bloco { border: 1px solid var(--linha); border-radius: 12px; padding: 1rem 1.1rem; background: #fff; }
+.revisao__bloco h3 { font-family: var(--sans); font-size: .66rem; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: var(--cinza); margin: 0 0 .5rem; }
+.revisao__bloco p { margin: 0 0 .25rem; }
+.revisao__linha { display: flex; justify-content: space-between; gap: 1rem; padding: .45rem 0; border-bottom: 1px dashed var(--linha); font-size: .9rem; }
+.revisao__linha:last-child { border-bottom: 0; }
+.revisao__linha small { display: block; color: var(--cinza); font-size: .74rem; }
+.revisao__totais { border-top: 1px solid var(--tinta); padding-top: .6rem; display: grid; gap: .35rem; }
+.revisao__totais div { display: flex; justify-content: space-between; font-size: .9rem; }
+.revisao__totais .total b { font-family: var(--serif); font-weight: 400; font-size: 1.25rem; }
+
+.envio-whats {
+  margin-top: 1.4rem; padding: clamp(1.1rem, 3vw, 1.6rem); border-radius: 16px;
+  background: linear-gradient(180deg, var(--rosa-lavado), #fff 70%); border: 1px solid var(--rosa-claro);
+}
+.envio-whats__titulo { font-family: var(--serif); font-size: clamp(1.05rem, 2vw, 1.25rem); line-height: 1.45; margin: 0 0 .5rem; }
+.envio-whats .bt--zap { margin-top: .8rem; }
+
+.confirmacao__msg { width: 100%; max-width: 520px; text-align: left; }
+.confirmacao__msg summary { cursor: pointer; font-size: .8rem; color: var(--grafite); }
+.confirmacao__msg pre { white-space: pre-wrap; font: .8rem/1.55 var(--sans); background: var(--areia); padding: .9rem; border-radius: 10px; margin-top: .5rem; }
+
+@media (max-width: 560px) {
+  .passos-pedido li { padding: .45rem .6rem; font-size: .62rem; }
+  .passo-pedido__acoes .bt { flex: 1 1 100%; min-width: 0; }
+}

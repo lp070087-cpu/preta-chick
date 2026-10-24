@@ -3,9 +3,10 @@
    --------------------------------------------------------------------------
    GET  /api/loja/catalogo              preço/estoque reais do banco
    POST /api/loja/frete                 cotação por CEP
-   POST /api/loja/cupom                 confere cupom contra a sacola
-   POST /api/loja/pedidos               finalizar pelo site
-   POST /api/loja/atendimentos          finalizar com atendimento exclusivo (WhatsApp)
+   POST /api/loja/pedidos-whatsapp      registra o pedido e devolve a mensagem/link do WhatsApp
+
+   REGRA COMERCIAL: pedidos SOMENTE pelo WhatsApp. Não existe pagamento no
+   site — a cliente informa a preferência e a loja conclui a venda.
    POST /api/loja/webhook/melhorenvio   eventos de envio (assinatura HMAC)
    POST /api/loja/webhook/pagamento/:p  eventos do provedor de pagamento
 
@@ -52,7 +53,10 @@ async function getCatalogo(req, res) {
     ok: true,
     produtos: lista.map(L.produtoPublico),
     checkout: {
-      pagamentoAutomatico: P.status().configurado,
+      canal: "whatsapp",
+      whatsapp: await L.whatsappDaLoja(),
+      pagamentos: await L.opcoesPagamento(),
+      retirada: (await F.opcoesLocais()).find((o) => o.id === "retirada") || null,
       freteAutomatico: F.configurado(),
     },
   }, { "Cache-Control": "no-cache", "Vercel-CDN-Cache-Control": "max-age=15" });
@@ -66,96 +70,11 @@ async function postFrete(req, res) {
   return http.ok(res, Object.assign({ ok: true }, r));
 }
 
-/* ---------------------------------------------------------------- cupom */
-async function postCupom(req, res) {
-  const c = await http.corpo(req);
-  const pre = await L.precificar(c.itens, {});
-  const cup = await L.aplicarCupom(c.codigo, pre.subtotal, null);
-  return http.ok(res, { ok: true, codigo: cup.codigo, desconto: cup.desconto, freteGratis: cup.freteGratis, subtotal: pre.subtotal });
-}
-
-/* ------------------------------------------------- finalizar pelo site */
-async function postPedido(req, res) {
+/* -------------------------------------------- pedido pelo WhatsApp */
+async function postPedidoWhatsapp(req, res) {
   const c = await http.corpo(req);
   const cliente = await clienteOpcional(req);
-  const idem = L.chaveIdem(c.chave);
-
-  if (idem) {
-    const ja = await db.um("SELECT * FROM orders WHERE idempotency_key = $1", [idem]);
-    if (ja) return http.ok(res, { ok: true, repetido: true, pedido: L.pedidoPublico(ja), whatsapp: await L.whatsappDaLoja() });
-  }
-
-  const contato = L.validarContato(c.contato || {});
-  const pre = await L.precificar(c.itens, { exigirPreco: true, exigirEstoque: true });
-
-  const escolha = L.texto(c.entrega && c.entrega.id, 40);
-  if (!escolha) throw L.erroNegocio("Escolha a forma de entrega.", 400, { campo: "entrega" });
-  let endereco = null, opcao;
-  if (escolha === "retirada") {
-    const locais = await F.opcoesLocais();
-    opcao = locais.find((o) => o.id === "retirada");
-    if (!opcao) throw L.erroNegocio("Retirada na loja não está disponível.", 409, { campo: "entrega" });
-  } else {
-    endereco = L.validarEndereco(c.endereco || {});
-    opcao = await F.confirmarOpcao(endereco.cep, pre.linhas, escolha);
-    if (!opcao.pagavelNoSite || opcao.preco == null) {
-      throw L.erroNegocio("Esta forma de entrega é combinada no atendimento. Escolha outra ou finalize pelo WhatsApp.", 409, { campo: "entrega" });
-    }
-  }
-
-  const cup = await L.aplicarCupom(c.cupom, pre.subtotal, opcao.preco);
-  const frete = cup.freteGratis ? 0 : opcao.preco;
-  const total = Math.max(0, pre.subtotal - cup.desconto) + frete;
-  const metodo = L.texto(c.pagamento && c.pagamento.metodo, 30) || null;
-
-  const pedido = await db.transacao(async (t) => {
-    const o = await L.inserirPedido(t, {
-      customer_id: cliente ? cliente.id : null, channel: "site", payment_method: metodo,
-      name: contato.nome, phone: contato.fone, email: contato.email || (cliente && cliente.email) || null,
-      address: endereco, items: pre.linhas, subtotal: pre.subtotal, discount: cup.desconto,
-      shipping_cents: frete, total, coupon_code: cup.codigo,
-      shipping: { tipo: opcao.tipo, id: opcao.id, nome: opcao.nome, empresa: opcao.empresa || null, servicoId: opcao.servicoId || null, prazo: opcao.prazo, preco: opcao.preco },
-      notes: L.texto(c.observacao, 500) || null, stock_committed: true, idempotency_key: idem,
-    });
-    await L.baixarEstoque(t, pre.linhas, { tipo: "order", id: o.code });
-    if (cup.codigo) {
-      const u = await t.query("UPDATE coupons SET uses = uses + 1 WHERE code = $1 AND (max_uses IS NULL OR uses < max_uses) RETURNING code", [cup.codigo]);
-      if (!u.rowCount) throw L.erroNegocio("Este cupom acabou de atingir o limite de usos.", 409, { campo: "cupom" });
-    }
-    await L.evento(t, "order_events", "order_id", o.id, "criado", { canal: "site", entrega: opcao.id });
-    if (cliente && endereco && c.salvarEndereco) {
-      await t.query(
-        "INSERT INTO customer_addresses (customer_id, recipient, cep, street, number, complement, district, city, uf, is_default) " +
-        "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOT EXISTS (SELECT 1 FROM customer_addresses WHERE customer_id = $1))",
-        [cliente.id, contato.nome, endereco.cep, endereco.rua, endereco.numero, endereco.complemento || null, endereco.bairro, endereco.cidade, endereco.uf]);
-    }
-    return o;
-  });
-
-  /* Cobrança automática só se o provedor da loja estiver ligado. Falhar
-     aqui NÃO desfaz o pedido: a loja envia o pagamento pelo atendimento. */
-  let final = pedido;
-  const ad = P.adaptador();
-  if (ad) {
-    try {
-      const cob = await ad.criarCobranca(pedido, { metodo });
-      final = await db.um("UPDATE orders SET payment_provider = $1, payment_ref = $2, payment_link = $3, updated_at = now() WHERE id = $4 RETURNING *",
-        [ad.nome, cob.ref, cob.link || null, pedido.id]);
-      await db.consulta("INSERT INTO payment_transactions (order_id, provider, provider_ref, method, status, amount_cents) VALUES ($1,$2,$3,$4,'pendente',$5) ON CONFLICT DO NOTHING",
-        [pedido.id, ad.nome, cob.ref, metodo, pedido.total_cents]);
-    } catch (e) {
-      await db.consulta("INSERT INTO order_events (order_id, kind, detail) VALUES ($1,'pagamento_erro',$2)", [pedido.id, JSON.stringify({ erro: e.message })]);
-    }
-  }
-
-  return http.criado(res, { ok: true, pedido: L.pedidoPublico(final), whatsapp: await L.whatsappDaLoja() });
-}
-
-/* ------------------------------------------ finalizar com atendimento */
-async function postAtendimento(req, res) {
-  const c = await http.corpo(req);
-  const cliente = await clienteOpcional(req);
-  const r = await L.criarAtendimento(c, cliente);
+  const r = await L.criarPedidoWhatsapp(c, cliente);
   return http.enviar(res, r.repetida ? 200 : 201, {
     ok: true,
     codigo: r.sol.code,
@@ -164,6 +83,7 @@ async function postAtendimento(req, res) {
     mensagem: r.mensagem,
     url: "https://wa.me/" + r.numero + "?text=" + encodeURIComponent(r.mensagem),
     vinculadoAConta: !!(cliente && r.sol.customer_id),
+    repetido: !!r.repetida,
   });
 }
 
@@ -248,9 +168,8 @@ module.exports = async function handler(req, res) {
   try {
     if (partes[0] === "catalogo" && m === "GET") return await getCatalogo(req, res);
     if (partes[0] === "frete" && m === "POST") return await postFrete(req, res);
-    if (partes[0] === "cupom" && m === "POST") return await postCupom(req, res);
-    if (partes[0] === "pedidos" && m === "POST") return await postPedido(req, res);
-    if (partes[0] === "atendimentos" && m === "POST") return await postAtendimento(req, res);
+    if ((partes[0] === "pedidos-whatsapp" || partes[0] === "atendimentos") && m === "POST") return await postPedidoWhatsapp(req, res);
+    if (partes[0] === "pedidos" && m === "POST") return http.erro(res, 410, "Os pedidos são finalizados pelo WhatsApp da loja.");
     if (partes[0] === "webhook" && partes[1] === "melhorenvio" && m === "POST") return await webhookMelhorEnvio(req, res);
     if (partes[0] === "webhook" && partes[1] === "pagamento" && partes[2] && m === "POST") return await webhookPagamento(req, res, partes[2]);
     return http.erro(res, 404, "Rota não encontrada.");

@@ -455,7 +455,7 @@ const LB = (function () {
         '<h3 style="margin-top:.5rem">' + escapa(p.nome) + '</h3>' +
         '<p class="texto-peq" style="margin-bottom:1rem">Cor ' + escapa(p.cor) + ' · ' + tamanhosDe(p).join(" · ") + '</p>' +
         '<div class="prod__preco" style="padding-block:.9rem;margin-bottom:1.1rem">' + precoHTML(p) +
-          '<span class="nota">' + (temPreco(p) ? 'Pague pelo site ou finalize com atendimento exclusivo no WhatsApp.' : 'O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.') + '</span></div>' +
+          '<span class="nota">' + (temPreco(p) ? 'Finalize o pedido com atendimento exclusivo pelo WhatsApp.' : 'O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.') + '</span></div>' +
         '<div class="prod__grupo"><span class="rotulo">Tamanho</span><div class="tamanhos" data-tams="' + p.id + '">' +
           botoesTamanho(p) +
         '</div></div>' +
@@ -493,14 +493,13 @@ const LB = (function () {
     return soma;
   }
 
-  /* As duas formas de finalizar — na gaveta e na página da sacola. */
+  /* Finalização: pedido montado no site e enviado pelo WhatsApp da loja.
+     Não há pagamento no site — a equipe confirma e conclui a venda. */
   function finalizarHTML(compacto) {
     return '<div class="finalizar' + (compacto ? " finalizar--compacto" : "") + '">' +
-      '<p class="finalizar__titulo">Como você prefere finalizar sua compra?</p>' +
-      '<p class="finalizar__texto">Você pode concluir seu pedido diretamente pelo site ou receber nosso atendimento exclusivo pelo WhatsApp. ' +
-      'Nossa equipe ajuda você a escolher suas peças, conferir disponibilidade e encontrar a melhor combinação.</p>' +
-      '<a class="bt bt--rosa bt--largo" href="sacola.html#site" data-finalizar="site">Finalizar pelo site</a>' +
-      '<a class="bt bt--zap bt--largo" href="sacola.html#atendimento" data-finalizar="atendimento">' + ICO.zap + '<span>Receber atendimento exclusivo no WhatsApp</span></a>' +
+      '<p class="finalizar__texto">Monte seu pedido, escolha a entrega e envie para nossa equipe pelo WhatsApp. ' +
+      'Confirmamos suas peças, a disponibilidade e ajudamos você a finalizar a compra.</p>' +
+      '<a class="bt bt--rosa bt--largo" href="sacola.html" data-finalizar="whatsapp">Finalizar pedido</a>' +
     '</div>';
   }
 

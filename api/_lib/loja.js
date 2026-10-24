@@ -27,6 +27,7 @@ const POOL = { query: (sql, p) => db.consulta(sql, p) };
 const TAMANHOS = ["PP", "P", "M", "G", "GG"];
 
 const STATUS_ATENDIMENTO = {
+  solicitacao_criada: "Solicitação criada",
   aguardando_atendimento: "Aguardando atendimento",
   em_atendimento: "Em atendimento",
   aguardando_confirmacao: "Aguardando confirmação",
@@ -34,6 +35,7 @@ const STATUS_ATENDIMENTO = {
   pago: "Pago",
   em_separacao: "Em separação",
   enviado: "Enviado",
+  disponivel_retirada: "Disponível para retirada",
   concluido: "Concluído",
   cancelado: "Cancelado",
 };
@@ -43,6 +45,7 @@ const STATUS_PEDIDO = {
   pago: "Pago",
   em_separacao: "Em separação",
   enviado: "Enviado",
+  disponivel_retirada: "Disponível para retirada",
   entregue: "Entregue",
   concluido: "Concluído",
   cancelado: "Cancelado",
@@ -55,6 +58,7 @@ const PEDIDO_PARA_ATENDIMENTO = {
   pago: "pago",
   em_separacao: "em_separacao",
   enviado: "enviado",
+  disponivel_retirada: "disponivel_retirada",
   entregue: "concluido",
   concluido: "concluido",
   cancelado: "cancelado",
@@ -301,70 +305,131 @@ async function whatsappDaLoja() {
   return n;
 }
 
-/* ------------------------------------------------- mensagem do WhatsApp */
-function mensagemAtendimento(sol, linhas, contato) {
-  const partes = [];
-  partes.push("Olá, Preta Chik! Quero finalizar minha compra com atendimento exclusivo.");
-  partes.push("");
-  partes.push("*Solicitação " + sol.code + "*");
-  if (contato && contato.nome) partes.push("Nome: " + contato.nome);
-  partes.push("");
-  partes.push("*Peças escolhidas:*");
-  linhas.forEach((l, i) => {
-    partes.push((i + 1) + ". " + l.nome + " — Tam. " + l.tam + (l.cor ? " · " + l.cor : "") +
-      " · " + l.qtd + "x" + (l.preco_unit != null ? " · " + reais(l.preco_unit) : ""));
-  });
-  const sub = linhas.some((l) => l.preco_unit == null) ? null : linhas.reduce((s, l) => s + l.total, 0);
-  partes.push("");
-  partes.push("Subtotal: " + (sub == null ? "a confirmar com a loja" : reais(sub)));
-  if (sol.cep) partes.push("CEP para entrega: " + sol.cep.replace(/^(\d{5})(\d{3})$/, "$1-$2"));
-  if (sol.customer_note) { partes.push(""); partes.push("Observação: " + sol.customer_note); }
-  partes.push("");
-  partes.push("Pode me ajudar a conferir a disponibilidade e fechar o pedido?");
-  return partes.join("\n");
+/* ------------------------------------------------- mensagem do WhatsApp
+   Formato combinado com a loja. Só dados necessários para o atendimento:
+   nada de CPF, e-mail ou dado de cartão.                                  */
+function enderecoLinha(e) {
+  if (!e) return "";
+  return e.rua + ", " + e.numero + (e.complemento ? " — " + e.complemento : "") + " · " + e.bairro + " · " +
+    e.cidade + "/" + e.uf + " · CEP " + String(e.cep).replace(/^(\d{5})(\d{3})$/, "$1-$2");
 }
 
-/* ------------------------------------------------- criar atendimento */
-async function criarAtendimento(corpo, cliente) {
+function mensagemPedido(sol) {
+  const linhas = sol.original_items || sol.items || [];
+  const env = sol.shipping || {};
+  const sub = linhas.some((l) => l.preco_unit == null) ? null : linhas.reduce((t, l) => t + l.preco_unit * l.qtd, 0);
+  const frete = env.preco;
+  const total = sub == null || frete == null ? null : sub + frete;
+  const p = [];
+  p.push("*PRETA CHIK — NOVO PEDIDO*");
+  p.push("");
+  p.push("Olá! Montei meu pedido pelo site da Preta Chik e gostaria de finalizar com atendimento exclusivo.");
+  p.push("");
+  p.push("*Pedido: #" + sol.code + "*");
+  p.push("");
+  p.push("*Meus produtos:*");
+  linhas.forEach((l, i) => {
+    p.push((i + 1) + ". " + l.nome);
+    p.push("Tamanho: " + l.tam);
+    if (l.cor) p.push("Cor: " + l.cor);
+    p.push("Quantidade: " + l.qtd);
+    p.push("Valor: " + (l.preco_unit == null ? "a confirmar com a loja" : reais(l.preco_unit) + (l.qtd > 1 ? " cada" : "")));
+    p.push("");
+  });
+  p.push("Entrega: " + (env.tipo === "retirada" ? "Retirada na loja" : env.nome ? "Envio — " + env.nome + (env.empresa ? " (" + env.empresa + ")" : "") : "Envio"));
+  if (env.tipo !== "retirada" && sol.address) p.push("Endereço: " + enderecoLinha(sol.address));
+  p.push("Frete: " + (env.tipo === "retirada" ? "sem frete (retirada)" : frete == null ? "a confirmar" : reais(frete) + (env.prazo ? " · prazo estimado " + env.prazo + " dias úteis" : "")));
+  p.push("Pagamento preferido: " + (sol.payment_pref || "a combinar"));
+  p.push("Subtotal: " + (sub == null ? "a confirmar" : reais(sub)));
+  p.push("Total: " + (total == null ? "a confirmar" : reais(total)));
+  p.push("Cliente: " + (sol.name || ""));
+  if (sol.customer_note) p.push("Observação: " + sol.customer_note);
+  p.push("");
+  p.push("Gostaria de confirmar a disponibilidade e finalizar meu pedido. Obrigada!");
+  return p.join("\n");
+}
+
+async function opcoesPagamento(cliente) {
+  const v = await lerAjuste("pagamento", cliente).catch(() => null);
+  const l = v && Array.isArray(v.opcoes) ? v.opcoes.map((x) => texto(x, 60)).filter(Boolean) : [];
+  return l.length ? l : ["PIX", "Cartão de crédito", "Cartão de débito", "Dinheiro na retirada"];
+}
+
+/* ------------------------------------------ criar pedido pelo WhatsApp
+   Regra de estoque: NADA é reservado aqui. Abrir o WhatsApp não é venda.
+   A baixa acontece quando a atendente CONFIRMA a venda no painel (gera o
+   pedido); cancelar ou reembolsar devolve. Peças esgotadas (estoque 0)
+   são recusadas já aqui, para a cliente trocar o tamanho.               */
+async function criarPedidoWhatsapp(corpo, cliente) {
+  const F = require("./frete"); // carregado aqui para evitar ciclo frete <-> loja
   const idem = chaveIdem(corpo && corpo.chave);
+  const numero = await whatsappDaLoja();
   if (idem) {
     const ja = await db.um("SELECT * FROM service_requests WHERE idempotency_key = $1", [idem]);
-    if (ja) {
-      const numero = await whatsappDaLoja();
-      return { sol: ja, numero, mensagem: mensagemAtendimento(ja, ja.original_items, { nome: ja.name }), repetida: true };
-    }
+    if (ja) return { sol: ja, numero, mensagem: mensagemPedido(ja), repetida: true };
   }
+
   const pre = await precificar(corpo && corpo.itens, {});
-  const nome = texto((corpo && corpo.nome) || (cliente && cliente.name), 120) || null;
-  const fone = digitos((corpo && corpo.fone) || (cliente && cliente.whatsapp)) || null;
-  const email = texto((corpo && corpo.email) || (cliente && cliente.email), 160).toLowerCase() || null;
-  const cep = digitos(corpo && corpo.cep);
+  const esgotados = pre.problemas.filter((x) => x.motivo === "esgotado");
+  const bloqueio = pre.problemas.filter((x) => !x.aviso).concat(esgotados);
+  if (bloqueio.length) throw erroNegocio("Algumas peças da sacola não estão disponíveis nesse tamanho. Revise a sacola.", 409, { problemas: bloqueio });
+
+  const contato = validarContato({
+    nome: (corpo && corpo.nome) || (cliente && cliente.name),
+    fone: (corpo && corpo.fone) || (cliente && cliente.whatsapp),
+    email: (corpo && corpo.email) || (cliente && cliente.email),
+  });
+
+  const ent = (corpo && corpo.entrega) || {};
+  let shipping, endereco = null;
+  if (ent.tipo === "retirada") {
+    const loc = (await F.opcoesLocais()).find((o) => o.id === "retirada");
+    if (!loc) throw erroNegocio("A retirada na loja não está disponível no momento.", 409, { campo: "entrega" });
+    shipping = { tipo: "retirada", id: "retirada", nome: "Retirada na loja", preco: 0, prazo: null };
+  } else if (ent.tipo === "envio") {
+    endereco = validarEndereco(corpo.endereco || {});
+    shipping = { tipo: "envio", id: null, nome: "Frete a confirmar com nossa equipe", preco: null, prazo: null };
+    if (ent.opcaoId && ent.opcaoId !== "local") {
+      /* Só vale o preço que a integração devolver AGORA, no servidor. */
+      try {
+        const o = await F.confirmarOpcao(endereco.cep, pre.linhas, texto(ent.opcaoId, 40));
+        if (o && o.tipo === "melhorenvio" && o.preco != null) {
+          shipping = { tipo: "melhorenvio", id: o.id, servicoId: o.servicoId, nome: o.nome, empresa: o.empresa || null, preco: o.preco, prazo: o.prazo || null };
+        }
+      } catch (e) { /* cotação indisponível: segue com frete a confirmar */ }
+    } else if (ent.opcaoId === "local") {
+      shipping = { tipo: "local", id: "local", nome: "Entrega local (valor combinado no atendimento)", preco: null, prazo: null };
+    }
+  } else {
+    throw erroNegocio("Escolha a forma de entrega.", 400, { campo: "entrega" });
+  }
+
+  const opcoes = await opcoesPagamento();
+  const pref = texto(corpo && corpo.pagamento, 60);
+  if (!pref || opcoes.indexOf(pref) < 0) throw erroNegocio("Escolha como prefere pagar.", 400, { campo: "pagamento" });
   const nota = texto(corpo && corpo.observacao, 500) || null;
 
   const sol = await db.transacao(async (c) => {
-    let tentativa = 0, linha = null;
-    while (!linha && tentativa < 5) {
-      tentativa++;
+    for (let t = 0; t < 5; t++) {
       try {
         const r = await c.query(
-          "INSERT INTO service_requests (code, customer_id, name, phone, email, cep, original_items, items, " +
-          "subtotal_cents, customer_note, idempotency_key) VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8,$9,$10) RETURNING *",
-          [gerarCodigo("AT"), cliente ? cliente.id : null, nome, fone, email, cep.length === 8 ? cep : null,
-           JSON.stringify(pre.linhas), pre.subtotal, nota, idem]);
-        linha = r.rows[0];
+          "INSERT INTO service_requests (code, customer_id, name, phone, email, cep, address, original_items, items, subtotal_cents, " +
+          "shipping, shipping_cents, payment_pref, customer_note, status, forwarded_at, idempotency_key) " +
+          "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,'aguardando_atendimento',now(),$14) RETURNING *",
+          [gerarCodigo("PC"), cliente ? cliente.id : null, contato.nome, contato.fone, contato.email,
+           endereco ? endereco.cep : null, endereco ? JSON.stringify(endereco) : null, JSON.stringify(pre.linhas), pre.subtotal,
+           JSON.stringify(shipping), shipping.preco, pref, nota, idem]);
+        await c.query("INSERT INTO service_request_events (request_id, kind, detail) VALUES ($1,'criado',$2)",
+          [r.rows[0].id, JSON.stringify({ origem: "site", encaminhado: "whatsapp", itens: pre.linhas.length, entrega: shipping.nome, pagamento: pref })]);
+        return r.rows[0];
       } catch (e) {
-        if (e && e.code === "23505" && /code/.test(e.constraint || e.detail || "")) continue;
+        if (e && e.code === "23505" && /code/.test(e.constraint || "")) continue;
         throw e;
       }
     }
-    if (!linha) throw new Error("não consegui gerar código único");
-    await c.query("INSERT INTO service_request_events (request_id, kind, detail) VALUES ($1,'criado',$2)",
-      [linha.id, JSON.stringify({ origem: "site", itens: pre.linhas.length })]);
-    return linha;
+    throw new Error("não consegui gerar código único");
   });
-
-  const numero = await whatsappDaLoja();
-  return { sol, numero, mensagem: mensagemAtendimento(sol, pre.linhas, { nome }) };
+  return { sol, numero, mensagem: mensagemPedido(sol) };
 }
 
 /* ------------------------------------------------------- inserir pedido */
@@ -376,11 +441,12 @@ async function inserirPedido(c, dados) {
         "name, phone, email, address, items, subtotal_cents, discount_cents, shipping_cents, total_cents, coupon_code, " +
         "shipping, sold_by, notes, stock_committed, idempotency_key) " +
         "VALUES ($1,$2,$3,$4,'aguardando_pagamento','pendente',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *",
-        [gerarCodigo("PC"), dados.customer_id || null, dados.channel, dados.service_request_id || null, dados.payment_method || null,
+        [t === 0 && dados.code ? dados.code : gerarCodigo("PC"), dados.customer_id || null, dados.channel, dados.service_request_id || null, dados.payment_method || null,
          dados.name, dados.phone, dados.email || null, dados.address ? JSON.stringify(dados.address) : null,
          JSON.stringify(dados.items), dados.subtotal, dados.discount || 0, dados.shipping_cents || 0, dados.total,
          dados.coupon_code || null, dados.shipping ? JSON.stringify(dados.shipping) : null, dados.sold_by || null,
          dados.notes || null, !!dados.stock_committed, dados.idempotency_key || null]);
+      if (dados.payment_pref) await c.query("UPDATE orders SET payment_pref = $1 WHERE id = $2", [dados.payment_pref, r.rows[0].id]);
       return r.rows[0];
     } catch (e) {
       if (e && e.code === "23505" && /orders_code/.test(e.constraint || "")) continue;
@@ -445,6 +511,7 @@ function pedidoPublico(o) {
     total: o.total_cents,
     entrega: o.shipping ? { tipo: o.shipping.tipo, nome: o.shipping.nome, prazo: o.shipping.prazo || null } : null,
     endereco: o.address || null,
+    pagamentoPreferido: o.payment_pref || null,
     rastreio: o.tracking_code || null,
     rastreioUrl: o.tracking_url || null,
     criadoEm: o.created_at,
@@ -462,6 +529,10 @@ function atendimentoPublico(s) {
     subtotal: s.subtotal_cents,
     desconto: s.discount_cents,
     frete: s.shipping_cents,
+    entrega: s.shipping ? { tipo: s.shipping.tipo, nome: s.shipping.nome, prazo: s.shipping.prazo || null } : null,
+    endereco: s.address || null,
+    pagamentoPreferido: s.payment_pref || null,
+    encaminhadoEm: s.forwarded_at || null,
     pedido: s.order_code || null,
     criadoEm: s.created_at,
     atualizadoEm: s.updated_at,
@@ -472,7 +543,7 @@ module.exports = {
   TAMANHOS, STATUS_ATENDIMENTO, STATUS_PEDIDO, PEDIDO_PARA_ATENDIMENTO,
   erroNegocio, gerarCodigo, texto, digitos, inteiro, chaveIdem, reais,
   catalogo, produtoPublico, precificar, aplicarCupom, baixarEstoque, devolverEstoque,
-  validarContato, validarEndereco, lerAjuste, whatsappDaLoja, mensagemAtendimento,
-  criarAtendimento, inserirPedido, evento, mudarStatusPedido, confirmarPagamento,
+  validarContato, validarEndereco, lerAjuste, whatsappDaLoja, mensagemPedido, opcoesPagamento, enderecoLinha,
+  criarPedidoWhatsapp, inserirPedido, evento, mudarStatusPedido, confirmarPagamento,
   pedidoPublico, atendimentoPublico,
 };

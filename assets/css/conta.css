@@ -414,3 +414,9 @@ body.tem-conta main { padding-bottom: 5.5rem; }
 .cx-historico li:last-child .cx-historico__pt { background: var(--rosa); box-shadow: 0 0 0 5px rgba(255, 101, 195, .2); }
 .cx-historico b { display: block; font-weight: 400; font-size: .88rem; color: var(--tinta); }
 .cx-historico time { display: block; font-size: .74rem; color: var(--cinza); margin-top: .15rem; }
+
+
+/* pedidos pelo WhatsApp: entrega, frete, preferência e situação */
+.cx-at-dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem 1rem; margin: .9rem 0 0; padding-top: .8rem; border-top: 1px dashed var(--linha); }
+.cx-at-dados dt { font-size: .62rem; letter-spacing: .16em; text-transform: uppercase; color: var(--cinza); }
+.cx-at-dados dd { margin: .15rem 0 0; font-size: .86rem; }

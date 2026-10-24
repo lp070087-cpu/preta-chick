@@ -135,7 +135,7 @@
       '</span>' +
       '<button class="bt bt--rosa" type="button" id="addSacola">Adicionar à sacola</button>' +
     '</div>' +
-    '<button class="bt bt--zap bt--largo" type="button" id="comprarAtendimento">' + LB.ICO.zap + '<span>Comprar com atendimento exclusivo</span></button>' +
+    '<button class="bt bt--vazio bt--largo" type="button" id="comprarAtendimento">Comprar agora</button>' +
     '<button class="bt bt--vazio bt--largo" type="button" id="addFavorito">Salvar nos favoritos</button>' +
 
     '<ul class="prod__extra">' +
@@ -148,7 +148,7 @@
       '<div class="acordeao__item">' +
         '<button class="acordeao__bt" type="button" aria-expanded="false">Como comprar<i></i></button>' +
         '<div class="acordeao__painel"><div class="acordeao__dentro">' +
-          '<p class="texto-peq">Escolha o tamanho e a cor e adicione à sacola. Na sacola você escolhe: <strong>finalizar pelo site</strong> (peças com valor e estoque confirmados) ou receber o <strong>atendimento exclusivo pelo WhatsApp</strong>, em que a equipe confere disponibilidade, sugere combinações e fecha o pedido com você.</p>' +
+          '<p class="texto-peq">Escolha o tamanho e a cor e adicione à sacola. Na sacola você escolhe a entrega, informa como prefere pagar e envia o pedido pelo <strong>WhatsApp</strong>. Nossa equipe confere a disponibilidade, sugere combinações e conclui a compra com você.</p>' +
           '<p class="texto-peq"><a class="lk" href="https://wa.me/5581984023286" target="_blank" rel="noopener">Falar com a loja agora</a></p>' +
         '</div></div>' +
       '</div>' +
@@ -174,7 +174,7 @@
     var preco = document.querySelector("#prodPreco");
     preco.innerHTML = LB.precoHTML(p) +
       '<span class="nota">' + (temPreco(p)
-        ? "Pague pelo site ou finalize com atendimento exclusivo no WhatsApp."
+        ? "Finalize o pedido com atendimento exclusivo pelo WhatsApp."
         : "O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.") + '</span>';
     var caixa = document.querySelector("[data-tams-produto]");
     caixa.innerHTML = LB.botoesTamanho(p);
@@ -242,7 +242,7 @@
   document.querySelector("#comprarAtendimento").addEventListener("click", function () {
     if (!seloTam) { LB.toast("Escolha um tamanho disponível"); return; }
     LB.adicionar(p.id, corEscolhida, seloTam, qtd);
-    location.href = "sacola.html#atendimento";
+    location.href = "sacola.html";
   });
   function pintarBotaoFavorito() {
     var bt = document.querySelector("#addFavorito");

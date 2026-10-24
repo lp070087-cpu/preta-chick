@@ -22,6 +22,7 @@
   const TZ = "America/Recife";
 
   const STATUS_AT = {
+    solicitacao_criada: "Solicitação criada",
     aguardando_atendimento: "Aguardando atendimento",
     em_atendimento: "Em atendimento",
     aguardando_confirmacao: "Aguardando confirmação",
@@ -29,6 +30,7 @@
     pago: "Pago",
     em_separacao: "Em separação",
     enviado: "Enviado",
+    disponivel_retirada: "Disponível para retirada",
     concluido: "Concluído",
     cancelado: "Cancelado",
   };
@@ -37,6 +39,7 @@
     pago: "Pago",
     em_separacao: "Em separação",
     enviado: "Enviado",
+    disponivel_retirada: "Disponível para retirada",
     entregue: "Entregue",
     concluido: "Concluído",
     cancelado: "Cancelado",
@@ -47,17 +50,17 @@
     pix: "Pix", cartao_credito: "Cartão de crédito", cartao_debito: "Cartão de débito",
     link: "Link de pagamento", dinheiro: "Dinheiro", transferencia: "Transferência",
   };
-  const CANAIS = { site: "Site", atendimento: "Atendimento" };
-  const TIPOS_FRETE = { melhorenvio: "Transportadora (Melhor Envio)", retirada: "Retirada na loja", local: "Entrega local", manual: "Frete combinado" };
+  const CANAIS = { site: "Site", atendimento: "WhatsApp" };
+  const TIPOS_FRETE = { melhorenvio: "Transportadora (Melhor Envio)", retirada: "Retirada na loja", local: "Entrega local", manual: "Frete combinado", envio: "Envio — frete a confirmar" };
   const PAPEIS = { proprietaria: "Proprietária", atendente: "Atendente" };
   const TIPOS_CUPOM = { percent: "Percentual", fixed: "Valor fixo", frete: "Frete grátis" };
   const EVENTOS = {
     criado: "Criado", status: "Status", itens: "Peças alteradas", valores: "Valores e entrega",
     nota: "Nota interna", assumido: "Atendimento assumido", pedido: "Pedido gerado",
-    pagamento: "Pagamento registrado", envio: "Envio / rastreio", etiqueta: "Etiqueta gerada", frete: "Frete",
+    pagamento: "Pagamento registrado", envio: "Envio / rastreio", etiqueta: "Etiqueta gerada", frete: "Frete", endereco: "Endereço alterado",
   };
   const TOM = {
-    aguardando_atendimento: "alerta", em_atendimento: "rosa", aguardando_confirmacao: "alerta",
+    solicitacao_criada: "neutro", aguardando_atendimento: "alerta", em_atendimento: "rosa", aguardando_confirmacao: "alerta", disponivel_retirada: "info",
     aguardando_pagamento: "alerta", pago: "ok", em_separacao: "info", enviado: "info",
     entregue: "ok", concluido: "ok", cancelado: "neutro", reembolsado: "perigo",
   };
@@ -402,7 +405,7 @@
 
   const MODULOS = [
     { id: "dashboard", nome: "Dashboard", rec: "dashboard", tela: telaDashboard, ic: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z" },
-    { id: "atendimento", nome: "Atendimento", rec: "atendimento", tela: telaAtendimento, ic: "M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.5-5A8 8 0 1 1 21 12z" },
+    { id: "atendimento", nome: "Pedidos pelo WhatsApp", rec: "atendimento", tela: telaAtendimento, ic: "M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.5-5A8 8 0 1 1 21 12z" },
     { id: "pedidos", nome: "Pedidos", rec: "pedidos", tela: telaPedidos, ic: "M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2" },
     { id: "produtos", nome: "Produtos", rec: "produtos:ler", tela: telaProdutos, ic: "M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 7.5h.01" },
     { id: "categorias", nome: "Categorias", rec: "produtos:ler", tela: telaCategorias, ic: "M3 6h7l2 2h9v11H3z" },
@@ -638,7 +641,7 @@
   function telaAtendimento(el, args, q) {
     if (args[0]) return detalheAtendimento(el, args[0]);
     const status = q.status || "", busca = q.q || "";
-    el.innerHTML = cabecalho("Atendimento exclusivo", "Solicitações de clientes que preferem fechar a compra pelo WhatsApp") +
+    el.innerHTML = cabecalho("Pedidos pelo WhatsApp", "Pedidos montados no site e enviados para o WhatsApp da loja. Confira, ajuste e conclua a venda.") +
       `<div class="filtros">
         ${chips("Filtrar por status", [["", "Todos"]].concat(Object.keys(STATUS_AT).map((k) => [k, STATUS_AT[k]])), status, "data-status")}
         <form class="busca" role="search" id="busca-at">
@@ -656,21 +659,23 @@
     carregar($("#lista-at", el), () => api("GET", "atendimentos" + (qs.toString() ? "?" + qs : "")), (d, alvo) => {
       const l = d.atendimentos || [];
       if (!l.length) {
-        alvo.innerHTML = vazio(status || busca ? "Nenhuma solicitação com esses filtros." : "Nenhuma solicitação de atendimento ainda. Elas chegam quando a cliente escolhe “atendimento exclusivo” na sacola do site.");
+        alvo.innerHTML = vazio(status || busca ? "Nenhuma solicitação com esses filtros." : "Nenhum pedido pelo WhatsApp ainda. Eles chegam quando a cliente clica em “Finalizar pedido pelo WhatsApp” na sacola do site.");
         return;
       }
-      alvo.innerHTML = `<p class="texto-peq">${plural(l.length, "solicitação", "solicitações")}</p>` + tabela(
-        ["Código", "Cliente", "Peças", "Subtotal", "Status", "Atendente", "Criado em", "Pedido"],
+      alvo.innerHTML = `<p class="texto-peq">${plural(l.length, "pedido", "pedidos")}</p>` + tabela(
+        ["Número", "Data", "Cliente", "Peças", "Subtotal", "Entrega", "Frete", "Pagamento preferido", "Status", "Responsável"],
         l.map((a) => [
-          `<a class="lk-forte" href="#atendimento/${enc(a.id)}">${esc(a.code)}</a>`,
+          `<a class="lk-forte" href="#atendimento/${enc(a.id)}">${esc(a.code)}</a>${a.order_code ? '<br><span class="texto-peq">venda confirmada</span>' : ""}`,
+          esc(dataHora(a.created_at)),
           `${esc(a.name || "Sem nome")}<br><span class="texto-peq">${esc(fone(a.phone))}</span>`,
           esc(a.itens),
           esc(brl(a.subtotal_cents)),
+          esc(a.entrega || "—"),
+          a.shipping_cents == null ? "a confirmar" : esc(brl(a.shipping_cents)),
+          esc(a.payment_pref || "—"),
           tagAt(a.status),
           esc(a.atendente || "—"),
-          esc(dataHora(a.created_at)),
-          a.order_code ? esc(a.order_code) : "—",
-        ]), "Solicitações de atendimento");
+        ]), "Pedidos pelo WhatsApp");
     });
   }
 
@@ -679,7 +684,7 @@
 
   function detalheAtendimento(el, id) {
     AT = { id, dados: null, cotacao: null, edicao: null };
-    el.innerHTML = `<p class="voltar"><a href="#atendimento">← Atendimentos</a></p><div id="at-det"></div>`;
+    el.innerHTML = `<p class="voltar"><a href="#atendimento">← Pedidos pelo WhatsApp</a></p><div id="at-det"></div>`;
     carregar($("#at-det", el), () => Promise.all([
       api("GET", "atendimentos/" + enc(id)),
       garantirCatalogo().catch(() => null),
@@ -858,7 +863,7 @@
     alvo.innerHTML = `
       <header class="det-topo">
         <div>
-          <p class="em em--rosa">Atendimento exclusivo</p>
+          <p class="em em--rosa">Pedido pelo WhatsApp</p>
           <h1 class="det-titulo">${esc(a.code)}</h1>
           <p class="det-meta">${tagAt(a.status)} <span>Aberto em ${esc(dataHora(a.created_at))}</span> <span>Atendente: ${esc(a.atendente || "ninguém assumiu")}</span>${a.vendedor ? ` <span>Vendido por: ${esc(a.vendedor)}</span>` : ""}</p>
         </div>
@@ -932,29 +937,59 @@
 
           ${editavel ? `
           <section class="cartao" aria-labelledby="h-gerar">
-            <div class="cartao-topo"><h2 id="h-gerar">Gerar pedido</h2></div>
-            <p class="texto-peq">Confira peças, valores e entrega. Ao gerar, o estoque controlado é baixado e o pedido fica aguardando pagamento.</p>
+            <div class="cartao-topo"><h2 id="h-gerar">Confirmar venda</h2></div>
+            <p class="texto-peq">Confira peças, valores e entrega com a cliente. Ao confirmar, o estoque controlado é baixado (nunca antes) e o pedido fica aguardando pagamento.</p>
             <form id="form-converter" novalidate>
               ${tipoEnvio === "retirada" ? '<p class="faixa faixa--info">Retirada na loja: endereço não é necessário.</p>' : `
               <fieldset class="grupo">
                 <legend>Endereço de entrega</legend>
                 <div class="grade-campos">
-                  ${campo("CEP", "cep", { valor: cepFmt(a.cep), req: true, attrs: 'inputmode="numeric" autocomplete="postal-code" maxlength="9"' })}
-                  ${campo("Rua", "rua", { req: true, attrs: 'autocomplete="address-line1"', cls: "campo--2" })}
-                  ${campo("Número", "numero", { req: true })}
-                  ${campo("Complemento", "complemento", {})}
-                  ${campo("Bairro", "bairro", { req: true })}
-                  ${campo("Cidade", "cidade", { req: true })}
-                  ${campo("UF", "uf", { req: true, attrs: 'maxlength="2" autocapitalize="characters"' })}
+                  ${campo("CEP", "cep", { valor: cepFmt(a.address ? a.address.cep : a.cep), req: true, attrs: 'inputmode="numeric" autocomplete="postal-code" maxlength="9"' })}
+                  ${campo("Rua", "rua", { valor: a.address ? a.address.rua : "", req: true, attrs: 'autocomplete="address-line1"', cls: "campo--2" })}
+                  ${campo("Número", "numero", { valor: a.address ? a.address.numero : "", req: true })}
+                  ${campo("Complemento", "complemento", { valor: a.address ? a.address.complemento || "" : "" })}
+                  ${campo("Bairro", "bairro", { valor: a.address ? a.address.bairro : "", req: true })}
+                  ${campo("Cidade", "cidade", { valor: a.address ? a.address.cidade : "", req: true })}
+                  ${campo("UF", "uf", { valor: a.address ? a.address.uf : "", req: true, attrs: 'maxlength="2" autocapitalize="characters"' })}
                 </div>
               </fieldset>`}
               ${campo("Forma de pagamento prevista (opcional)", "metodo", { tipo: "select", opcoes: opcoes(METODOS, "", "A definir") })}
-              <button type="submit" class="btn">Gerar pedido</button>
+              <button type="submit" class="btn">Confirmar venda</button>
             </form>
           </section>` : ""}
         </div>
 
         <aside class="det-lateral">
+          <section class="cartao" aria-labelledby="h-pedido-site">
+            <div class="cartao-topo"><h2 id="h-pedido-site">Pedido enviado pela cliente</h2></div>
+            <dl class="dados">
+              <div><dt>Encaminhado</dt><dd>${a.forwarded_at ? esc(dataHora(a.forwarded_at)) + ' <span class="texto-peq">(o site abriu o WhatsApp; confira se a mensagem chegou)</span>' : "—"}</dd></div>
+              <div><dt>Entrega</dt><dd>${esc(a.shipping ? (TIPOS_FRETE[a.shipping.tipo] || a.shipping.nome || "—") : "—")}${a.shipping && a.shipping.nome && a.shipping.tipo === "melhorenvio" ? " · " + esc(a.shipping.nome) : ""}</dd></div>
+              <div><dt>Frete</dt><dd>${a.shipping_cents == null ? "a confirmar" : esc(brl(a.shipping_cents))}</dd></div>
+              <div><dt>Endereço</dt><dd>${a.address ? esc(a.address.rua + ", " + a.address.numero + (a.address.complemento ? " — " + a.address.complemento : "") + " · " + a.address.bairro + " · " + a.address.cidade + "/" + a.address.uf + " · CEP " + cepFmt(a.address.cep)) : (a.shipping && a.shipping.tipo === "retirada" ? "Retirada na loja" : "—")}</dd></div>
+              <div><dt>Pagamento preferido</dt><dd>${esc(a.payment_pref || "—")} <span class="texto-peq">(só preferência — nada foi cobrado)</span></dd></div>
+            </dl>
+            ${editavel ? `<details class="detalhes">
+              <summary>Editar endereço ou pagamento preferido</summary>
+              <form id="form-endereco" novalidate>
+                <div class="grade-campos">
+                  ${campo("CEP", "cep", { valor: cepFmt(a.address ? a.address.cep : a.cep), attrs: 'inputmode="numeric" maxlength="9"' })}
+                  ${campo("Rua", "rua", { valor: a.address ? a.address.rua : "", cls: "campo--2" })}
+                  ${campo("Número", "numero", { valor: a.address ? a.address.numero : "" })}
+                  ${campo("Complemento", "complemento", { valor: a.address ? a.address.complemento || "" : "" })}
+                  ${campo("Bairro", "bairro", { valor: a.address ? a.address.bairro : "" })}
+                  ${campo("Cidade", "cidade", { valor: a.address ? a.address.cidade : "" })}
+                  ${campo("UF", "uf", { valor: a.address ? a.address.uf : "", attrs: 'maxlength="2"' })}
+                </div>
+                <button type="submit" class="btn btn--vazio btn--peq">Salvar endereço</button>
+              </form>
+              <form id="form-pref" novalidate>
+                ${campo("Pagamento preferido", "pagamento", { valor: a.payment_pref || "" })}
+                <button type="submit" class="btn btn--vazio btn--peq">Salvar preferência</button>
+              </form>
+            </details>` : ""}
+          </section>
+
           <section class="cartao" aria-labelledby="h-cliente">
             <div class="cartao-topo"><h2 id="h-cliente">Cliente</h2></div>
             <dl class="dados">
@@ -1001,6 +1036,17 @@
     const base = "atendimentos/" + enc(AT.id);
     const aplicar = (r, msg) => { AT.dados = r; desenharAt($("#at-det")); if (msg) aviso(msg); };
     const bt = (acao) => $(`[data-acao="${acao}"]`, alvo);
+
+    const fEnd = $("#form-endereco", alvo);
+    if (fEnd) aoEnviar(fEnd, async (dd) => {
+      if (digitos(dd.cep).length !== 8) throw erroCampo("CEP com 8 números.", "cep");
+      aplicar(await api("POST", base + "/endereco", { cep: digitos(dd.cep), rua: dd.rua, numero: dd.numero, complemento: dd.complemento, bairro: dd.bairro, cidade: dd.cidade, uf: (dd.uf || "").toUpperCase() }), "Endereço atualizado.");
+    });
+    const fPref = $("#form-pref", alvo);
+    if (fPref) aoEnviar(fPref, async (dd) => {
+      if (!dd.pagamento) throw erroCampo("Informe a forma de pagamento.", "pagamento");
+      aplicar(await api("POST", base + "/pagamento-preferido", { pagamento: dd.pagamento }), "Preferência atualizada.");
+    });
 
     const assumir = bt("assumir");
     if (assumir) assumir.addEventListener("click", () => executar(assumir, async () => aplicar(await api("POST", base + "/assumir", {}), "Atendimento assumido por você.")));
@@ -1331,14 +1377,15 @@
         corpo: `<div class="faixa faixa--alerta"><p><strong>Use só para dinheiro que JÁ ENTROU na conta da loja</strong> e foi conferido na plataforma de pagamento (Pix recebido, maquininha, link pago, dinheiro em mãos).</p><p>Este registro não cobra a cliente. Quando a soma registrada alcança o total, o pedido passa a “Pago”.</p></div>
           ${campo("Forma recebida", "metodo", { tipo: "select", opcoes: opcoes(METODOS, "", "Escolha…"), req: true })}
           ${campoReais("Valor recebido (R$)", "valor", resta || o.total_cents, { req: true })}
-          ${campo("Referência conferível", "referencia", { req: true, ajuda: "ID do Pix, NSU da maquininha ou código da transação na plataforma.", attrs: 'autocomplete="off"' })}
+          ${campo("Data do recebimento", "data", { tipo: "date", valor: new Date().toLocaleDateString("en-CA", { timeZone: TZ }), req: true })}
+          ${campo("Referência da transação (quando houver)", "referencia", { ajuda: "ID do Pix, NSU da maquininha ou código na plataforma. Dinheiro na retirada pode ficar sem.", attrs: 'autocomplete="off"' })}
           ${campo("Observação (opcional)", "observacao", { tipo: "textarea", linhas: 2 })}`,
         aoConfirmar: async (dd) => {
           if (!dd.metodo) throw erroCampo("Escolha a forma de pagamento recebida.", "metodo");
           const v = paraCentavos(dd.valor);
           if (!v || Number.isNaN(v)) throw erroCampo("Informe o valor recebido.", "valor");
-          if (!dd.referencia) throw erroCampo("Informe uma referência conferível.", "referencia");
-          aplicar(await api("POST", base + "/pagamento", { metodo: dd.metodo, valor: v, referencia: dd.referencia, observacao: dd.observacao }), "Pagamento registrado.");
+          if (!dd.data) throw erroCampo("Informe a data do recebimento.", "data");
+          aplicar(await api("POST", base + "/pagamento", { metodo: dd.metodo, valor: v, referencia: dd.referencia, data: dd.data, observacao: dd.observacao }), "Pagamento registrado.");
         },
       }));
 
@@ -1748,7 +1795,7 @@
     carregar($("#lista-cli", el), () => api("GET", "clientes" + (busca ? "?q=" + enc(busca) : "")), (d, alvo) => {
       const l = d.clientes || [];
       if (!l.length) { alvo.innerHTML = vazio(busca ? "Nenhuma cliente encontrada." : "Nenhuma cliente com conta no site ainda."); return; }
-      alvo.innerHTML = `<p class="texto-peq">${plural(l.length, "cliente", "clientes")}</p>` + tabela(["Cliente", "WhatsApp", "Pedidos", "Atendimentos", "Total pago", "Desde"], l.map((c) => [
+      alvo.innerHTML = `<p class="texto-peq">${plural(l.length, "cliente", "clientes")}</p>` + tabela(["Cliente", "WhatsApp", "Pedidos", "Pedidos WhatsApp", "Total pago", "Desde"], l.map((c) => [
         `<a class="lk-forte" href="#clientes/${enc(c.id)}">${esc(c.name)}</a><br><span class="texto-peq">${esc(c.email)}</span>`,
         esc(fone(c.whatsapp)), esc(c.pedidos), esc(c.atendimentos), esc(brl0(c.gasto)), esc(dataCurta(c.criado)),
       ]), "Clientes");
@@ -2065,7 +2112,7 @@
   function telaConfig(el) {
     el.innerHTML = cabecalho("Configurações", "Dados da loja, frete, remetente e integrações") + '<div id="cfg"></div>';
     carregar($("#cfg", el), () => api("GET", "config"), (d, alvo) => {
-      const aj = d.ajustes || {}, loja = aj.loja || {}, fr = aj.frete || {}, rem = aj.remetente || {};
+      const aj = d.ajustes || {}, loja = aj.loja || {}, fr = aj.frete || {}, rem = aj.remetente || {}, pg = aj.pagamento || {};
       const integ = d.integracoes || { pagamento: {}, frete: {} };
       integ.pagamento = integ.pagamento || {}; integ.frete = integ.frete || {};
       alvo.innerHTML = `
@@ -2085,6 +2132,12 @@
             <button type="submit" class="btn">Salvar frete</button>
           </form>
         </div>
+        <form id="cfg-pag" class="cartao" novalidate>
+          <h2 class="sub-tit">Formas de pagamento oferecidas no pedido</h2>
+          <p class="texto-peq">A cliente escolhe uma destas como <strong>preferência</strong> ao enviar o pedido pelo WhatsApp. O site não cobra nada: a equipe envia o pagamento depois de confirmar. Uma por linha. Opções com “retirada” só aparecem para quem escolhe retirar na loja.</p>
+          ${campo("Opções (uma por linha)", "opcoes", { tipo: "textarea", linhas: 5, valor: (pg.opcoes || ["PIX", "Cartão de crédito", "Cartão de débito", "Dinheiro na retirada"]).join("\n") })}
+          <button type="submit" class="btn">Salvar formas de pagamento</button>
+        </form>
         <form id="cfg-rem" class="cartao" novalidate>
           <h2 class="sub-tit">Remetente (para etiquetas do Melhor Envio)</h2>
           <p class="texto-peq">Obrigatório para gerar etiquetas: nome, CPF/CNPJ e endereço completo da loja.</p>
@@ -2124,6 +2177,12 @@
         if (dd.cep_origem && digitos(dd.cep_origem).length !== 8) throw erroCampo("CEP com 8 números.", "cep_origem");
         await api("PUT", "config/frete", { cep_origem: digitos(dd.cep_origem), retirada_na_loja: dd.retirada_na_loja, entrega_local: dd.entrega_local });
         aviso("Ajustes de frete salvos.");
+      });
+      aoEnviar($("#cfg-pag", alvo), async (dd) => {
+        const l = String(dd.opcoes || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 12);
+        if (!l.length) throw erroCampo("Cadastre pelo menos uma forma de pagamento.", "opcoes");
+        await api("PUT", "config/pagamento", { opcoes: l });
+        aviso("Formas de pagamento salvas.");
       });
       aoEnviar($("#cfg-rem", alvo), async (dd) => {
         const doc = digitos(dd.documento);

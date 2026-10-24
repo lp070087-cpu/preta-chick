@@ -16,17 +16,21 @@
   var palco = document.querySelector("#palco");
   if (!palco) return;
 
-  /* foto -> peça da loja (a foto é a mesma do cartão daquela peça) */
+  /* foto -> peça da loja: cada recorte vem da MESMA foto usada no cartão
+     daquela peça (assets/img/preta-chik/modelo -> card/pNN-a|b).          */
   var LOOKS = [
-    { foto: "modelo-1", produto: "p02" },
+    { foto: "modelo-1", produto: "p04" },
     { foto: "modelo-2", produto: "p03" },
-    { foto: "modelo-3", produto: "p01" },
-    { foto: "modelo-4", produto: "p06" },
-    { foto: "modelo-5", produto: "p04" },
+    { foto: "modelo-3", produto: "p06" },
+    { foto: "modelo-4", produto: "p04" },
+    { foto: "modelo-5", produto: "p03" },
     { foto: "modelo-6", produto: "p05" }
   ];
   /* posições de referência (slot 0 = frente) */
   var POS = [79, 58, 42, 29, 18, 8.5];
+  /* celular: só 4 modelos visíveis, fila mais aberta para não se amontoar */
+  var POS_CEL = [72, 46, 27, 11, 4, 0];
+  var celular = window.matchMedia("(max-width: 560px)");
   var ESC = [1, .8, .67, .57, .5, .44];
   var DESF = [0, 0, .8, 1.8, 2.8, 3.8];
   var OPAC = [1, 1, .96, .86, .7, .55];
@@ -69,7 +73,7 @@
     els.forEach(function (el, i) {
       var slot = (i - atual + N) % N;
       var p = produto(i);
-      el.style.left = POS[slot] + "%";
+      el.style.left = (celular.matches ? POS_CEL : POS)[slot] + "%";
       el.style.setProperty("--escala", ESC[slot]);
       el.style.setProperty("--desfoque", DESF[slot] + "px");
       el.style.setProperty("--opacidade", OPAC[slot]);
@@ -137,6 +141,7 @@
   });
   palco.addEventListener("pointercancel", function () { x0 = null; arrastou = false; });
 
+  if (celular.addEventListener) celular.addEventListener("change", pintar);
   document.addEventListener("lb:catalogo", pintar);
   document.addEventListener("lb:favoritos", function () { pintarLado(produto(atual)); });
   pintar();

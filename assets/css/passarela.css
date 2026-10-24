@@ -178,7 +178,7 @@
 }
 @media (max-width: 560px) {
   .passarela__palco { height: min(500px, 74svh); border-radius: 18px; }
-  .modelo { width: 56%; height: 90%; }
+  .modelo { width: 50%; height: 90%; }
   .modelo[data-slot="4"], .modelo[data-slot="5"] { opacity: 0 !important; pointer-events: none; }
   .passarela__compra { flex-direction: column; align-items: stretch; }
   .passarela__ver { justify-content: space-between; }

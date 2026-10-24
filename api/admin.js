@@ -204,19 +204,25 @@ async function pagamentoManual(staff, id, c) {
   const metodo = T(c.metodo, 30);
   if (P.METODOS_MANUAIS.indexOf(metodo) < 0) throw neg("Escolha a forma de pagamento recebida.", 400, { campo: "metodo" });
   const valor = centavos(c.valor, "valor");
-  const ref = T(c.referencia, 120);
-  if (!ref) throw neg("Informe uma referência conferível (ID do Pix, NSU, código da transação).", 400, { campo: "referencia" });
+  /* Referência da transação quando existir (ID do Pix, NSU). Dinheiro na
+     retirada não tem: registra-se sem, com data e responsável. */
+  const ref = T(c.referencia, 120) || ("sem-ref-" + Date.now());
+  let recebido = null;
+  if (c.data) {
+    recebido = new Date(String(c.data).slice(0, 10) + "T12:00:00-03:00");
+    if (isNaN(recebido) || recebido.getTime() > Date.now() + 864e5) throw neg("Data do pagamento inválida.", 400, { campo: "data" });
+  }
   return db.transacao(async (t) => {
     const o = (await t.query("SELECT * FROM orders WHERE id = $1 FOR UPDATE", [id])).rows[0];
     if (!o) throw neg("Pedido não encontrado.", 404);
     if (o.status === "cancelado") throw neg("Pedido cancelado não recebe pagamento.");
     const ins = await t.query(
-      "INSERT INTO payment_transactions (order_id, provider, provider_ref, method, status, amount_cents, staff_id, note) " +
-      "VALUES ($1,'manual',$2,$3,'aprovado',$4,$5,$6) ON CONFLICT (provider, provider_ref) DO NOTHING RETURNING id",
-      [id, o.code + ":" + ref, metodo, valor, staff.id, T(c.observacao, 300) || null]);
+      "INSERT INTO payment_transactions (order_id, provider, provider_ref, method, status, amount_cents, staff_id, note, received_at) " +
+      "VALUES ($1,'manual',$2,$3,'aprovado',$4,$5,$6,COALESCE($7, now())) ON CONFLICT (provider, provider_ref) DO NOTHING RETURNING id",
+      [id, o.code + ":" + ref, metodo, valor, staff.id, T(c.observacao, 300) || null, recebido]);
     if (!ins.rowCount) throw neg("Esta referência de pagamento já foi registrada.", 409);
     const pago = (await t.query("SELECT coalesce(sum(amount_cents),0)::int AS s FROM payment_transactions WHERE order_id = $1 AND status = 'aprovado'", [id])).rows[0].s;
-    await L.evento(t, "order_events", "order_id", id, "pagamento", { metodo, valor, referencia: ref, manual: true, totalPago: pago }, staff.id);
+    await L.evento(t, "order_events", "order_id", id, "pagamento", { metodo, valor, referencia: ref.startsWith("sem-ref-") ? null : ref, data: recebido, manual: true, totalPago: pago }, staff.id);
     if (pago >= o.total_cents) return L.confirmarPagamento(t, o, { provider: "manual", ref, method: metodo }, staff.id);
     return o;
   });
@@ -303,8 +309,8 @@ async function converterAtendimento(staff, id, c) {
     if (s.shipping_cents == null) throw neg("Defina o frete (pode ser R$ 0,00 para retirada) antes de gerar o pedido.", 409);
     const contato = L.validarContato({ nome: contatoBase.nome || s.name, fone: contatoBase.fone || s.phone, email: contatoBase.email || s.email });
     const tipo = s.shipping && s.shipping.tipo;
-    const endereco = tipo === "retirada" ? null : (c.endereco ? L.validarEndereco(c.endereco) : null);
-    if (tipo === "melhorenvio" && !endereco) throw neg("Informe o endereço de entrega.", 400, { campo: "cep" });
+    const endereco = tipo === "retirada" ? null : (c.endereco ? L.validarEndereco(c.endereco) : s.address || null);
+    if (tipo !== "retirada" && !endereco) throw neg("Informe o endereço de entrega.", 400, { campo: "cep" });
     /* Revalida estoque controlado no momento da conversão. */
     for (const l of s.items) {
       const v = (await t.query("SELECT stock FROM product_variants WHERE id = $1 FOR UPDATE", [l.variant_id])).rows[0];
@@ -316,6 +322,7 @@ async function converterAtendimento(staff, id, c) {
       items: s.items.map((l) => { const x = Object.assign({}, l); delete x.estoqueAtual; x.total = x.preco_unit * x.qtd; return x; }),
       subtotal: tot.subtotal, discount: tot.desconto, shipping_cents: s.shipping_cents, total: tot.total,
       coupon_code: s.coupon_code, shipping: s.shipping, sold_by: staff.id, notes: s.notes, stock_committed: true,
+      code: s.code, payment_pref: s.payment_pref,
     });
     await L.baixarEstoque(t, s.items, { tipo: "order", id: o.code }, staff.id);
     if (s.coupon_code) await t.query("UPDATE coupons SET uses = uses + 1 WHERE code = $1", [s.coupon_code]);
@@ -438,7 +445,7 @@ module.exports = async function handler(req, res) {
         await db.transacao(async (t) => {
           const o = (await t.query("SELECT * FROM orders WHERE id = $1 FOR UPDATE", [p[1]])).rows[0];
           if (!o) throw neg("Pedido não encontrado.", 404);
-          if (["pago", "em_separacao", "enviado", "entregue", "concluido"].indexOf(c.status) > -1 && o.payment_status !== "aprovado") {
+          if (["pago", "em_separacao", "enviado", "disponivel_retirada", "entregue", "concluido"].indexOf(c.status) > -1 && o.payment_status !== "aprovado") {
             throw neg("Registre ou confirme o pagamento antes de avançar o pedido.", 409);
           }
           await L.mudarStatusPedido(t, o, c.status, staff.id, { motivo: T(c.motivo, 200) || null });
@@ -519,7 +526,7 @@ module.exports = async function handler(req, res) {
         const args = [], filtros = [];
         if (q.get("status")) { args.push(q.get("status")); filtros.push("r.status = $" + args.length); }
         if (q.get("q")) { args.push("%" + T(q.get("q"), 80) + "%"); filtros.push("(r.code ILIKE $" + args.length + " OR r.name ILIKE $" + args.length + " OR r.phone ILIKE $" + args.length + ")"); }
-        const r = await db.consulta("SELECT r.id, r.code, r.name, r.phone, r.status, r.subtotal_cents, r.created_at, r.updated_at, jsonb_array_length(r.items) AS itens, " +
+        const r = await db.consulta("SELECT r.id, r.code, r.name, r.phone, r.status, r.subtotal_cents, r.shipping_cents, r.created_at, r.updated_at, r.forwarded_at, r.payment_pref, r.shipping->>'nome' AS entrega, jsonb_array_length(r.items) AS itens, " +
           "a.name AS atendente, o.code AS order_code FROM service_requests r LEFT JOIN staff a ON a.id = r.assigned_to LEFT JOIN orders o ON o.id = r.order_id " +
           (filtros.length ? "WHERE " + filtros.join(" AND ") : "") + " ORDER BY (r.status IN ('concluido','cancelado')), r.created_at DESC LIMIT 300", args);
         return ok({ atendimentos: r.rows, status: L.STATUS_ATENDIMENTO });
@@ -569,6 +576,17 @@ module.exports = async function handler(req, res) {
           await t.query("UPDATE service_requests SET notes = $1, updated_at = now() WHERE id = $2", [novo.slice(-8000), s.id]);
           await L.evento(t, "service_request_events", "request_id", s.id, "nota", { texto: txt }, staff.id);
         });
+      } else if (p[2] === "endereco") {
+        const e = L.validarEndereco(c);
+        await db.transacao(async (t) => {
+          const s = await travarAtendimento(t, p[1]); editavel(s);
+          await t.query("UPDATE service_requests SET address = $1, cep = $2, updated_at = now() WHERE id = $3", [JSON.stringify(e), e.cep, s.id]);
+          await L.evento(t, "service_request_events", "request_id", s.id, "endereco", { cidade: e.cidade, uf: e.uf }, staff.id);
+        });
+      } else if (p[2] === "pagamento-preferido") {
+        const pref = T(c.pagamento, 60);
+        if (!pref) throw neg("Informe a forma de pagamento.", 400, { campo: "pagamento" });
+        await db.consulta("UPDATE service_requests SET payment_pref = $1, updated_at = now() WHERE id = $2", [pref, p[1]]);
       } else if (p[2] === "contato") {
         const ct = L.validarContato(c);
         await db.consulta("UPDATE service_requests SET name = $1, phone = $2, email = $3, updated_at = now() WHERE id = $4", [ct.nome, ct.fone, ct.email, p[1]]);
@@ -652,11 +670,12 @@ module.exports = async function handler(req, res) {
     if (p[0] === "config") {
       exigir(staff, "config");
       if (m === "PUT" && p[1]) {
-        const permitidas = ["loja", "frete", "remetente"];
+        const permitidas = ["loja", "frete", "remetente", "pagamento"];
         if (permitidas.indexOf(p[1]) < 0) throw neg("Ajuste desconhecido.");
         const c = await http.corpo(req);
         const limpo = {};
-        for (const k of Object.keys(c).slice(0, 30)) limpo[k] = typeof c[k] === "boolean" ? c[k] : T(c[k], 200);
+        for (const k of Object.keys(c).slice(0, 30)) limpo[k] = typeof c[k] === "boolean" ? c[k] : Array.isArray(c[k]) ? c[k].slice(0, 12).map((x) => T(x, 60)).filter(Boolean) : T(c[k], 200);
+        if (p[1] === "pagamento" && (!Array.isArray(limpo.opcoes) || !limpo.opcoes.length)) throw neg("Cadastre pelo menos uma forma de pagamento.", 400, { campo: "opcoes" });
         if (p[1] === "loja" && limpo.whatsapp && !/^\d{12,13}$/.test(L.digitos(limpo.whatsapp))) throw neg("WhatsApp com DDI e DDD, só números (ex.: 5581999999999).", 400, { campo: "whatsapp" });
         if (p[1] === "frete" && limpo.cep_origem && L.digitos(limpo.cep_origem).length !== 8) throw neg("CEP de origem inválido.", 400, { campo: "cep_origem" });
         await db.consulta("INSERT INTO settings (key, value, updated_at) VALUES ($1,$2,now()) ON CONFLICT (key) DO UPDATE SET value = settings.value || EXCLUDED.value, updated_at = now()", [p[1], JSON.stringify(limpo)]);

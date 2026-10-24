@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sacola — Preta Chik Moda Praia</title>
-<meta name="description" content="Sua sacola na Preta Chik Moda Praia. Finalize pelo site ou com atendimento exclusivo pelo WhatsApp.">
+<meta name="description" content="Monte seu pedido na Preta Chik Moda Praia e finalize com atendimento exclusivo pelo WhatsApp.">
 <meta name="theme-color" content="#0f1116">
 <link rel="icon" href="assets/img/logo/preta-chik.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,177 +26,137 @@
     </nav>
 
     <header class="titulo-pagina">
-      <span class="em em--rosa rev">Sua compra</span>
+      <span class="em em--rosa rev">Seu pedido</span>
       <h1 class="rev" style="--atraso:60ms">Sacola</h1>
     </header>
+
+    <!-- passos -->
+    <ol class="passos-pedido" id="passos" aria-label="Etapas do pedido">
+      <li data-passo="1" aria-current="step"><span>1</span> Sacola</li>
+      <li data-passo="2"><span>2</span> Entrega</li>
+      <li data-passo="3"><span>3</span> Pagamento</li>
+      <li data-passo="4"><span>4</span> Revisão</li>
+    </ol>
 
     <div id="sacolaVaziaWrap"></div>
     <div id="confirmacao" class="oculto" tabindex="-1"></div>
 
     <div class="carrinho" id="sacolaWrap" style="padding-bottom:clamp(3rem,7vw,6rem)">
       <div>
-        <div class="itens" id="listaItens"></div>
-
-        <div style="margin-top:1.6rem;display:flex;gap:.6rem;flex-wrap:wrap">
-          <a class="bt bt--vazio bt--pequeno" href="loja.html">Continuar comprando</a>
-          <button class="bt bt--vazio bt--pequeno" type="button" id="esvaziar">Esvaziar sacola</button>
-        </div>
-
-        <!-- ======================= ESCOLHA DA FINALIZAÇÃO ======================= -->
-        <section class="fin-escolha" aria-labelledby="escolhaTitulo">
-          <span class="em em--rosa">Finalização</span>
-          <h2 class="t-2" id="escolhaTitulo" style="margin-block:.6rem .5rem">Como você prefere finalizar sua compra?</h2>
-          <p class="texto-medio" style="max-width:62ch;margin-bottom:1.2rem">
-            Você pode concluir seu pedido diretamente pelo site ou receber nosso atendimento exclusivo pelo WhatsApp.
-            Nossa equipe ajuda você a escolher suas peças, conferir disponibilidade e encontrar a melhor combinação.
-          </p>
-          <div class="fin-escolha__opcoes" role="tablist" aria-label="Forma de finalizar">
-            <button class="fin-op" type="button" role="tab" id="abaSite" aria-controls="painelSite" aria-selected="false" data-modo="site">
-              <span class="fin-op__ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/></svg></span>
-              <b>Finalizar pelo site</b>
-              <span>Escolha a entrega, confira o total e conclua o pedido agora.</span>
-            </button>
-            <button class="fin-op fin-op--zap" type="button" role="tab" id="abaAtendimento" aria-controls="painelAtendimento" aria-selected="false" data-modo="atendimento">
-              <span class="fin-op__ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm0 1.8a8.2 8.2 0 0 1 0 16.4 8.1 8.1 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 0 1 12 3.8z"/></svg></span>
-              <b>Receber atendimento exclusivo no WhatsApp</b>
-              <span>Uma atendente da Preta Chik confere tamanhos, sugere combinações e fecha o pedido com você.</span>
-            </button>
+        <!-- ============================ 1. SACOLA ============================ -->
+        <section class="passo-pedido" id="etapa1" aria-labelledby="t1">
+          <h2 class="t-2 so-leitor" id="t1">1. Sacola</h2>
+          <div class="itens" id="listaItens"></div>
+          <div style="margin-top:1.4rem;display:flex;gap:.6rem;flex-wrap:wrap">
+            <a class="bt bt--vazio bt--pequeno" href="loja.html">Continuar comprando</a>
+            <button class="bt bt--vazio bt--pequeno" type="button" id="esvaziar">Esvaziar sacola</button>
+          </div>
+          <p class="texto-peq" id="erro1" role="alert" style="margin-top:.8rem"></p>
+          <div class="passo-pedido__acoes">
+            <button class="bt bt--rosa" type="button" data-ir="2">Escolher entrega</button>
           </div>
         </section>
 
-        <!-- ============================ PELO SITE ============================ -->
-        <section class="painel-compra oculto" id="painelSite" role="tabpanel" aria-labelledby="abaSite">
-          <div id="siteBloqueio"></div>
-
-          <form id="formSite" novalidate>
-            <fieldset class="painel-compra__bloco">
-              <legend class="t-3">1. Seus dados</legend>
-              <div class="duas-colunas" style="margin-top:0">
-                <label class="campo"><span class="rotulo">Nome completo</span>
-                  <input class="entrada" name="nome" autocomplete="name" required></label>
-                <label class="campo"><span class="rotulo">WhatsApp com DDD</span>
-                  <input class="entrada" name="fone" inputmode="tel" autocomplete="tel" placeholder="(81) 90000-0000" required></label>
-              </div>
-              <label class="campo"><span class="rotulo">E-mail <small>(para receber o resumo)</small></span>
-                <input class="entrada" name="email" type="email" autocomplete="email"></label>
-            </fieldset>
-
-            <fieldset class="painel-compra__bloco">
-              <legend class="t-3">2. Entrega</legend>
-              <div class="frete">
-                <div class="frete__cep">
-                  <label class="so-leitor" for="cep">CEP</label>
-                  <input class="entrada" id="cep" name="cep" type="text" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" maxlength="9">
-                  <button class="bt bt--rosa" type="button" id="calcular">Ver opções</button>
-                </div>
-                <p class="frete__aviso" id="freteAviso" aria-live="polite">Digite o CEP para ver as opções de entrega disponíveis.</p>
-                <div class="frete__opcoes oculto" id="freteOpcoes"></div>
-              </div>
-
-              <div id="blocoEndereco" class="oculto">
-                <div class="duas-colunas">
-                  <label class="campo"><span class="rotulo">Rua</span>
-                    <input class="entrada" name="rua" autocomplete="address-line1"></label>
-                  <label class="campo"><span class="rotulo">Número</span>
-                    <input class="entrada" name="numero" inputmode="numeric"></label>
-                </div>
-                <div class="duas-colunas">
-                  <label class="campo"><span class="rotulo">Complemento</span>
-                    <input class="entrada" name="complemento" autocomplete="address-line2"></label>
-                  <label class="campo"><span class="rotulo">Bairro</span>
-                    <input class="entrada" name="bairro"></label>
-                </div>
-                <div class="duas-colunas">
-                  <label class="campo"><span class="rotulo">Cidade</span>
-                    <input class="entrada" name="cidade" autocomplete="address-level2"></label>
-                  <label class="campo"><span class="rotulo">UF</span>
-                    <input class="entrada" name="uf" autocomplete="address-level1" maxlength="2"></label>
-                </div>
-                <label class="escolha oculto" id="linhaSalvarEndereco">
-                  <input type="checkbox" name="salvarEndereco">
-                  <span>Salvar este endereço na minha conta</span>
-                </label>
-              </div>
-            </fieldset>
-
-            <fieldset class="painel-compra__bloco">
-              <legend class="t-3">3. Pagamento</legend>
-              <div class="frete__opcoes" style="margin-top:0" id="opcoesPagamento">
-                <label class="opcao on"><input type="radio" name="pgto" value="pix" checked>
-                  <span class="opcao__corpo"><b>Pix</b><span id="notaPix">A loja confere o pedido e envia a chave Pix pelo WhatsApp.</span></span>
-                </label>
-                <label class="opcao"><input type="radio" name="pgto" value="link">
-                  <span class="opcao__corpo"><b>Cartão de crédito (link de pagamento)</b><span>A loja envia o link seguro da plataforma de pagamento dela. Parcelamento conforme a plataforma.</span></span>
-                </label>
-              </div>
-              <p class="texto-peq" id="notaPagamento" style="margin-top:.8rem">
-                Seu pedido fica reservado como <b>aguardando pagamento</b>. Nada é cobrado sem a sua confirmação, e o pedido só é marcado como pago quando o pagamento é confirmado.
-              </p>
-              <label class="campo" style="margin-top:1rem"><span class="rotulo">Observação para a loja <small>(opcional)</small></span>
-                <textarea class="entrada" name="observacao" rows="2" maxlength="500"></textarea></label>
-            </fieldset>
-
-            <button class="bt bt--rosa bt--largo" type="submit" id="confirmarSite">Confirmar pedido</button>
-            <p class="texto-peq" id="erroSite" role="alert" style="margin-top:.7rem"></p>
-          </form>
-        </section>
-
-        <!-- ======================= ATENDIMENTO EXCLUSIVO ======================= -->
-        <section class="painel-compra painel-compra--zap oculto" id="painelAtendimento" role="tabpanel" aria-labelledby="abaAtendimento">
-          <div class="zap-premium">
-            <span class="em em--rosa">Atendimento exclusivo</span>
-            <h3 class="t-2" style="margin-block:.5rem .6rem">Sua compra com quem entende de moda praia</h3>
-            <ul class="zap-premium__lista">
-              <li>Conferimos a disponibilidade de cada tamanho e cor da sua sacola.</li>
-              <li>Ajudamos com o caimento e sugerimos peças que combinam.</li>
-              <li>Fechamos valor, entrega e pagamento com você, sem pressa.</li>
-            </ul>
-          </div>
-          <form id="formAtendimento" novalidate>
-            <div class="duas-colunas" style="margin-top:0">
-              <label class="campo"><span class="rotulo">Seu nome</span>
-                <input class="entrada" name="nome" autocomplete="name"></label>
-              <label class="campo"><span class="rotulo">CEP para entrega <small>(opcional)</small></span>
-                <input class="entrada" name="cep" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" maxlength="9"></label>
+        <!-- ============================ 2. ENTREGA ============================ -->
+        <section class="passo-pedido oculto" id="etapa2" aria-labelledby="t2">
+          <span class="em em--rosa">Etapa 2</span>
+          <h2 class="t-2" id="t2" style="margin-block:.5rem 1.1rem">Como você quer receber?</h2>
+          <form id="formEntrega" novalidate>
+            <div class="frete__opcoes" style="margin-top:0" role="radiogroup" aria-label="Forma de entrega">
+              <label class="opcao"><input type="radio" name="modo" value="retirada">
+                <span class="opcao__corpo"><b>Retirada na loja</b><span id="infoRetirada">Estrada de Águas Compridas, 385 — Olinda/PE. A equipe avisa pelo WhatsApp quando o pedido estiver separado.</span></span>
+              </label>
+              <label class="opcao"><input type="radio" name="modo" value="envio">
+                <span class="opcao__corpo"><b>Entrega / envio</b><span>Para todo o Brasil. Informe o endereço para consultarmos o frete.</span></span>
+              </label>
             </div>
-            <label class="campo"><span class="rotulo">Quer contar algo para a atendente? <small>(opcional)</small></span>
-              <textarea class="entrada" name="observacao" rows="2" maxlength="500" placeholder="Ex.: tenho dúvida entre M e G; quero algo para combinar com uma saída."></textarea></label>
-            <button class="bt bt--zap bt--largo" type="submit" id="abrirAtendimento">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm0 1.8a8.2 8.2 0 0 1 0 16.4 8.1 8.1 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 0 1 12 3.8z"/></svg>
-              <span>Receber atendimento exclusivo no WhatsApp</span>
-            </button>
-            <p class="texto-peq" style="margin-top:.7rem">
-              Abrimos o WhatsApp oficial da Preta Chik com a sua sacola organizada e um código de atendimento.
-              Sua sacola continua salva aqui. Abrir a conversa não confirma pedido nem cobrança.
-            </p>
-            <p class="texto-peq" id="erroAtendimento" role="alert"></p>
+
+            <div class="duas-colunas">
+              <label class="campo"><span class="rotulo">Nome completo</span>
+                <input class="entrada" name="nome" autocomplete="name" required></label>
+              <label class="campo"><span class="rotulo">Telefone / WhatsApp com DDD</span>
+                <input class="entrada" name="fone" inputmode="tel" autocomplete="tel" placeholder="(81) 90000-0000" required></label>
+            </div>
+
+            <div id="blocoEnvio" class="oculto">
+              <div class="frete__cep" style="margin-top:.4rem">
+                <label class="so-leitor" for="cep">CEP</label>
+                <input class="entrada" id="cep" name="cep" type="text" inputmode="numeric" autocomplete="postal-code" placeholder="CEP 00000-000" maxlength="9">
+                <button class="bt bt--rosa" type="button" id="calcular">Consultar frete</button>
+              </div>
+              <p class="frete__aviso" id="freteAviso" aria-live="polite"></p>
+              <div class="frete__opcoes oculto" id="freteOpcoes"></div>
+              <div class="duas-colunas">
+                <label class="campo"><span class="rotulo">Endereço (rua)</span>
+                  <input class="entrada" name="rua" autocomplete="address-line1"></label>
+                <label class="campo"><span class="rotulo">Número</span>
+                  <input class="entrada" name="numero" inputmode="numeric"></label>
+              </div>
+              <div class="duas-colunas">
+                <label class="campo"><span class="rotulo">Complemento <small>(opcional)</small></span>
+                  <input class="entrada" name="complemento" autocomplete="address-line2"></label>
+                <label class="campo"><span class="rotulo">Bairro</span>
+                  <input class="entrada" name="bairro"></label>
+              </div>
+              <div class="duas-colunas">
+                <label class="campo"><span class="rotulo">Cidade</span>
+                  <input class="entrada" name="cidade" autocomplete="address-level2"></label>
+                <label class="campo"><span class="rotulo">Estado (UF)</span>
+                  <input class="entrada" name="uf" autocomplete="address-level1" maxlength="2"></label>
+              </div>
+            </div>
+            <p class="texto-peq" id="erro2" role="alert"></p>
+            <div class="passo-pedido__acoes">
+              <button class="bt bt--vazio" type="button" data-ir="1">Voltar</button>
+              <button class="bt bt--rosa" type="submit">Escolher pagamento</button>
+            </div>
           </form>
+        </section>
+
+        <!-- ============================ 3. PAGAMENTO ============================ -->
+        <section class="passo-pedido oculto" id="etapa3" aria-labelledby="t3">
+          <span class="em em--rosa">Etapa 3</span>
+          <h2 class="t-2" id="t3" style="margin-block:.5rem .5rem">Como você prefere pagar?</h2>
+          <p class="texto-peq" style="margin-bottom:1rem">Aqui você só informa a sua preferência. Nada é cobrado no site: a nossa equipe confirma o pedido com você e envia o pagamento pelo WhatsApp.</p>
+          <form id="formPagamento" novalidate>
+            <div class="frete__opcoes" style="margin-top:0" id="opcoesPagamento" role="radiogroup" aria-label="Preferência de pagamento"></div>
+            <label class="campo" style="margin-top:1rem"><span class="rotulo">Observação para a equipe <small>(opcional)</small></span>
+              <textarea class="entrada" name="observacao" rows="2" maxlength="500" placeholder="Ex.: tenho dúvida entre M e G; quero algo que combine com uma saída."></textarea></label>
+            <p class="texto-peq" id="erro3" role="alert"></p>
+            <div class="passo-pedido__acoes">
+              <button class="bt bt--vazio" type="button" data-ir="2">Voltar</button>
+              <button class="bt bt--rosa" type="submit">Revisar pedido</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- ============================ 4. REVISÃO ============================ -->
+        <section class="passo-pedido oculto" id="etapa4" aria-labelledby="t4">
+          <span class="em em--rosa">Etapa 4</span>
+          <h2 class="t-2" id="t4" style="margin-block:.5rem 1rem">Confira o seu pedido</h2>
+          <div id="revisao"></div>
+          <div class="envio-whats">
+            <p class="envio-whats__titulo">Seu pedido está quase pronto! Nossa equipe oferece um atendimento exclusivo para confirmar suas peças, verificar a disponibilidade e ajudar você a finalizar sua compra.</p>
+            <p class="texto-peq">Confira os detalhes e envie seu pedido para nossa equipe pelo WhatsApp.</p>
+            <button class="bt bt--zap bt--largo" type="button" id="finalizarWhats">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm0 1.8a8.2 8.2 0 0 1 0 16.4 8.1 8.1 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 0 1 12 3.8z"/></svg>
+              <span>Finalizar pedido pelo WhatsApp</span>
+            </button>
+            <p class="texto-peq" id="erro4" role="alert" style="margin-top:.6rem"></p>
+            <button class="bt bt--vazio bt--pequeno" type="button" data-ir="3" style="margin-top:.6rem">Voltar</button>
+          </div>
         </section>
       </div>
 
       <!-- resumo -->
-      <aside class="resumo" aria-label="Resumo da compra">
+      <aside class="resumo" aria-label="Resumo do pedido">
         <h3>Resumo</h3>
         <div class="resumo__linha"><span>Peças</span><b id="resumoPecas">0</b></div>
-        <div class="resumo__linha"><span>Subtotal</span><b id="resumoSub">sob consulta</b></div>
-        <div class="resumo__linha oculto" id="linhaDesconto"><span>Desconto <small id="cupomAplicado"></small></span><b id="resumoDesconto">—</b></div>
-        <div class="resumo__linha" id="linhaFrete" style="display:none"><span>Entrega</span><b id="resumoFrete">—</b></div>
-
-        <div class="resumo__cupom">
-          <label class="so-leitor" for="cupom">Cupom</label>
-          <input class="entrada" id="cupom" placeholder="Cupom de desconto" autocomplete="off">
-          <button class="bt bt--vazio" type="button" id="aplicarCupom">Aplicar</button>
-        </div>
-        <p class="texto-peq" id="cupomMsg" aria-live="polite"></p>
-
-        <div class="resumo__linha resumo__linha--total"><span>Total</span><b id="resumoTotal">sob consulta</b></div>
-
-        <div style="margin-top:1.3rem;display:grid;gap:.55rem">
-          <button class="bt bt--rosa bt--largo" type="button" data-modo="site">Finalizar pelo site</button>
-          <button class="bt bt--zap bt--largo" type="button" data-modo="atendimento">Atendimento exclusivo no WhatsApp</button>
-        </div>
+        <div class="resumo__linha"><span>Subtotal</span><b id="resumoSub">a confirmar</b></div>
+        <div class="resumo__linha"><span>Entrega</span><b id="resumoFrete">a escolher</b></div>
+        <div class="resumo__linha resumo__linha--total"><span id="rotuloTotal">Total</span><b id="resumoTotal">a confirmar</b></div>
         <p class="resumo__nota" id="resumoNota">
-          Valores e estoque são conferidos no servidor da loja no momento do pedido.
+          Pedido finalizado com atendimento exclusivo pelo WhatsApp. Valores e disponibilidade são confirmados pela nossa equipe antes de qualquer pagamento.
         </p>
       </aside>
     </div>
