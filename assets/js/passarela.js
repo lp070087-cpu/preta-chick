@@ -28,13 +28,16 @@
 
   /* foto -> peça da loja: cada recorte vem da MESMA foto usada no cartão
      daquela peça (assets/img/preta-chik/modelo -> card/pNN-a|b).          */
+  /* pe: linhas transparentes (de 1400) abaixo dos pés na foto — compensadas
+     para todas pisarem na mesma linha e terem a mesma altura.            */
+  var ALTURA_FOTO = 1400;
   var LOOKS = [
-    { foto: "modelo-1", produto: "p04" },
-    { foto: "modelo-2", produto: "p03" },
-    { foto: "modelo-3", produto: "p06" },
-    { foto: "modelo-4", produto: "p04" },
-    { foto: "modelo-5", produto: "p03" },
-    { foto: "modelo-6", produto: "p05" }
+    { foto: "modelo-1", produto: "p04", larg: 478 },
+    { foto: "modelo-2", produto: "p03", larg: 619 },
+    { foto: "modelo-3", produto: "p06", larg: 543, pe: 41 },
+    { foto: "modelo-4", produto: "p04", larg: 570 },
+    { foto: "modelo-5", produto: "p03", larg: 584 },
+    { foto: "modelo-6", produto: "p05", larg: 651 }
   ];
   /* posições de referência (slot 0 = frente) */
   var POS = [79, 58, 42, 29, 18, 8.5];
@@ -50,6 +53,8 @@
   var N = LOOKS.length;
   var atual = 0;
   var frente = -1;
+  var chegada = null;
+  var iniciado = false;
   var els = [];
 
   var $nome = document.querySelector("#passarelaNome");
@@ -68,6 +73,11 @@
     var b = document.createElement("button");
     b.type = "button";
     b.className = "modelo";
+    if (l.pe) {
+      var util = ALTURA_FOTO - l.pe;
+      b.style.setProperty("--img-h", (ALTURA_FOTO / util * 100) + "%");
+      b.style.setProperty("--img-base", (-l.pe / util * 100) + "%");
+    }
     b.innerHTML = '<span class="modelo__sombra" aria-hidden="true"></span>' +
       '<img class="modelo__img" src="assets/img/passarela/' + l.foto + '.webp" alt="" width="600" height="1400"' +
       (i < 3 ? ' fetchpriority="high"' : ' loading="lazy"') + ' decoding="async">';
@@ -140,12 +150,25 @@
   }
 
   /* ------------------------------------------------------- pintar */
+  /* foto mais larga que a caixa (ex.: modelo-6 no celular) não pode passar
+     da borda direita do palco: puxa só o necessário para dentro.         */
+  function posicao(i, slot, pos) {
+    var x = pos[slot];
+    var W = palco.clientWidth, H = els[i].offsetHeight;
+    if (!W || !H) return x;
+    var l = LOOKS[i], util = ALTURA_FOTO - (l.pe || 0);
+    var meia = (H * ALTURA_FOTO / util) * (l.larg / ALTURA_FOTO) * ESC[slot] / 2;
+    var limite = W - 6;
+    var direita = x / 100 * W + meia;
+    return direita > limite ? x - (direita - limite) / W * 100 : x;
+  }
+
   function pintarModelos() {
     var pos = celular.matches ? POS_CEL : POS;
     els.forEach(function (el, i) {
       var slot = (i - atual + N) % N;
       var p = produto(i);
-      el.style.setProperty("--pos", pos[slot]);
+      el.style.setProperty("--pos", posicao(i, slot, pos));
       el.style.setProperty("--escala", ESC[slot]);
       el.style.setProperty("--desfoque", DESF[slot] + "px");
       el.style.setProperty("--opacidade", OPAC[slot]);
@@ -159,11 +182,15 @@
     });
 
     if (frente !== atual) {
-      if (frente > -1) pousar(els[frente]);
+      if (frente > -1 && els[frente].classList.contains("modelo--frente")) pousar(els[frente]);
       var nova = els[atual];
       [nova.querySelector(".modelo__img"), nova.querySelector(".modelo__sombra")].forEach(limpar);
-      nova.classList.add("modelo--frente");
       frente = atual;
+      /* o flutuar só começa quando a modelo TERMINA de chegar à frente
+         (antes ela já flutuava enquanto ainda andava na fila) */
+      clearTimeout(chegada);
+      if (semMovimento.matches || !iniciado) nova.classList.add("modelo--frente");
+      else chegada = setTimeout(function () { if (frente === atual) els[atual].classList.add("modelo--frente"); }, 900);
     }
   }
 
@@ -223,7 +250,7 @@
     if (window.innerWidth === larguraAntes) return; // barra do navegador do celular
     larguraAntes = window.innerWidth;
     clearTimeout(espera);
-    espera = setTimeout(estabilizar, 150);
+    espera = setTimeout(function () { pintarModelos(); estabilizar(); }, 150);
   }, { passive: true });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(estabilizar);
 
@@ -278,4 +305,5 @@
 
   pintar();
   estabilizar();
+  iniciado = true;
 })();
