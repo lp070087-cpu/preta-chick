@@ -444,8 +444,8 @@
       try { sessionStorage.removeItem("pc_pedido_chave"); } catch (x) {}
       LB.toast("Sacola esvaziada");
     });
-    CONF.focus();
-    CONF.scrollIntoView({ block: "start" });
+    try { CONF.focus({ preventScroll: true }); } catch (x) { CONF.focus(); }
+    CONF.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
 
   /* -------------------------------------------------------- esvaziar */

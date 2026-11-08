@@ -389,9 +389,9 @@ const LB = (function () {
     alvo.setAttribute("aria-hidden", "false");
     if (qual === "menu") { const b = um("#btMenu"); if (b) b.setAttribute("aria-expanded", "true"); }
     if (qual === "sacola") desenharGaveta();
-    if (qual === "busca") setTimeout(function () { const c = um("#buscaCampo"); if (c) c.focus(); }, 120);
+    if (qual === "busca") setTimeout(function () { const c = um("#buscaCampo"); if (c) focoSemPulo(c); }, 120);
     const foco = um("[data-fecha='" + qual + "']");
-    if (foco && qual !== "busca") setTimeout(function () { foco.focus(); }, 320);
+    if (foco && qual !== "busca") setTimeout(function () { focoSemPulo(foco); }, 320);
     document.addEventListener("keydown", teclaEsc);
   }
 
@@ -406,7 +406,13 @@ const LB = (function () {
     const b = um("#btMenu"); if (b) b.setAttribute("aria-expanded", "false");
     const h = um("#btMenu"); if (h) h.classList.remove("ativo");
     document.removeEventListener("keydown", teclaEsc);
-    if (ultimoFoco && ultimoFoco.focus) ultimoFoco.focus();
+    if (ultimoFoco && ultimoFoco.focus) focoSemPulo(ultimoFoco);
+  }
+
+  /* devolve/coloca o foco sem rolar a pagina: no celular o foco comum
+     dava um salto na rolagem ao abrir/fechar menu, sacola e busca */
+  function focoSemPulo(alvo) {
+    try { alvo.focus({ preventScroll: true }); } catch (e) { alvo.focus(); }
   }
 
   function teclaEsc(e) { if (e.key === "Escape") fecharTudo(); }
@@ -742,7 +748,7 @@ const LB = (function () {
       const chip = e.target.closest("[data-chip]");
       if (chip) {
         const campo = um("#buscaCampo");
-        if (campo) { campo.value = chip.getAttribute("data-chip"); desenharBusca(campo.value); campo.focus(); }
+        if (campo) { campo.value = chip.getAttribute("data-chip"); desenharBusca(campo.value); focoSemPulo(campo); }
       }
 
       const ac = e.target.closest(".acordeao__bt");
@@ -778,11 +784,9 @@ const LB = (function () {
 
     // cabecalho ao rolar
     const cab = um("#cabecalho");
-    let ultimo = 0;
     function aoRolar() {
       const y = window.scrollY || 0;
       if (cab) cab.classList.toggle("rolou", y > 12);
-      if (Math.abs(y - ultimo) > 6) { pausarCorre(); ultimo = y; }
     }
     window.addEventListener("scroll", aoRolar, { passive: true });
     aoRolar();
@@ -844,17 +848,33 @@ const LB = (function () {
       });
     });
 
+    preCarregarLinks();
+
     document.dispatchEvent(new CustomEvent("lb:pronto"));
   }
 
-  /* pausa o marquee durante a rolagem (evita animacao brigando com o scroll) */
-  function pausarCorre() {
-    todos(".faixa-corre__trilho").forEach(function (t) {
-      if (t.dataset.pausado) return;
-      t.dataset.pausado = "1";
-      t.style.animationPlayState = "paused";
-      setTimeout(function () { t.style.animationPlayState = "running"; delete t.dataset.pausado; }, 320);
-    });
+  /* o marquee (.faixa-corre) roda so com transform, na GPU: nao precisa
+     mais ser pausado durante a rolagem — pausar/retomar a cada scroll
+     forcava recalculo de estilo e fazia a faixa "engasgar" no celular. */
+
+  /* pre-carrega a proxima pagina quando a cliente toca/passa o mouse num
+     link interno (Chrome/Edge/Android). Nao muda nada na tela; so deixa a
+     troca de pagina mais rapida. Fica de fora a API e o painel. */
+  function preCarregarLinks() {
+    try {
+      if (!HTMLScriptElement.supports || !HTMLScriptElement.supports("speculationrules")) return;
+      const s = document.createElement("script");
+      s.type = "speculationrules";
+      s.textContent = JSON.stringify({ prefetch: [{
+        where: { and: [
+          { href_matches: "/*" },
+          { not: { href_matches: "/api/*" } },
+          { not: { href_matches: "/admin*" } }
+        ] },
+        eagerness: "moderate"
+      }] });
+      document.head.appendChild(s);
+    } catch (e) { /* sem suporte: navega normalmente */ }
   }
 
   /* ------------------------------------------------------------- EXPORTA */

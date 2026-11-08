@@ -74,6 +74,7 @@ body {
 }
 
 body.travado { overflow: hidden; }   /* com drawer/modal aberto */
+html:has(body.travado) { overflow: hidden; }   /* iOS: sem isto a pagina de tras ainda rolava */
 
 img, svg, video { display: block; max-width: 100%; }
 img { height: auto; }
@@ -242,7 +243,7 @@ h1, h2, h3, h4, .serif { font-family: var(--serif); font-weight: 400; line-heigh
   transition-delay: var(--atraso, 0ms);
   will-change: opacity, transform;
 }
-.rev.visivel { opacity: 1; transform: none; }
+.rev.visivel { opacity: 1; transform: none; will-change: auto; }   /* libera a camada depois de revelar: menos memoria e rolagem mais lisa no celular */
 
 /* variantes */
 .rev--esq { transform: translateX(-30px); }

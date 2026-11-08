@@ -47,18 +47,26 @@
   background: linear-gradient(90deg, transparent, rgba(15,17,22,.08) 20%, rgba(15,17,22,.08) 80%, transparent);
 }
 
+/* A posição (--pos, em % do palco, vinda do JS) é aplicada por transform e
+   não por "left": a troca de look roda só na GPU, sem recalcular layout a
+   cada quadro — era isso que fazia o banner tremer no celular.
+   --largura é a largura da modelo em % do palco; --pos / --largura * 100%
+   converte a posição para % da própria modelo (o que o translate usa).   */
 .modelo {
-  position: absolute; bottom: 14px; width: 30%; height: 94%;
+  --largura: 30;
+  --x: calc(var(--pos, 50) / var(--largura) * 100% - 50%);
+  position: absolute; left: 0; bottom: 14px; width: calc(var(--largura) * 1%); height: 94%;
   margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
   transform-origin: 50% 100%;
-  transform: translateX(-50%) scale(var(--escala, 1));
+  transform: translate3d(var(--x), 0, 0) scale(var(--escala, 1));
   filter: blur(var(--desfoque, 0));
   opacity: var(--opacidade, 1);
   z-index: var(--z, 1);
   transition:
-    left .9s cubic-bezier(.76, 0, .24, 1),
     transform .9s cubic-bezier(.76, 0, .24, 1),
     filter .9s var(--ease), opacity .9s var(--ease);
+  will-change: transform, filter, opacity;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
   -webkit-tap-highlight-color: transparent;
 }
 .modelo:focus-visible { outline: 2px solid var(--rosa-forte); outline-offset: 4px; border-radius: 14px; }
@@ -74,9 +82,12 @@
   background: radial-gradient(closest-side, rgba(40,30,22,.32), rgba(40,30,22,0));
   filter: blur(4px);
 }
-.modelo:not(.modelo--frente):hover {
-  filter: blur(0) !important; opacity: 1 !important;
-  transform: translateX(-50%) translateY(-8px) scale(var(--escala, 1));
+/* só com mouse: no toque o :hover "gruda" na modelo tocada */
+@media (hover: hover) {
+  .modelo:not(.modelo--frente):hover {
+    filter: blur(0) !important; opacity: 1 !important;
+    transform: translate3d(var(--x), -8px, 0) scale(var(--escala, 1));
+  }
 }
 .modelo--frente .modelo__img { animation: pc-flutua 4.8s ease-in-out infinite; }
 .modelo--frente .modelo__sombra { animation: pc-sombra 4.8s ease-in-out infinite; }
@@ -178,7 +189,7 @@
 }
 @media (max-width: 560px) {
   .passarela__palco { height: min(500px, 74svh); border-radius: 18px; }
-  .modelo { width: 50%; height: 90%; }
+  .modelo { --largura: 50; height: 90%; }
   .modelo[data-slot="4"], .modelo[data-slot="5"] { opacity: 0 !important; pointer-events: none; }
   .passarela__compra { flex-direction: column; align-items: stretch; }
   .passarela__ver { justify-content: space-between; }

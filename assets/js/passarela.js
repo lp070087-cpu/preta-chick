@@ -8,6 +8,16 @@
    - clicar na modelo da frente abre a peça;
    - prefers-reduced-motion: sem flutuar e sem transição.
    Depende de dados.js e ui.js (LB).
+
+   Suavidade (principalmente no celular):
+   - a posição de cada modelo vai em --pos e é aplicada via transform
+     (passarela.css), sem animar "left" — nada de recalcular layout a cada
+     quadro;
+   - a modelo que sai da frente "pousa" do ponto em que estava flutuando,
+     em vez de saltar de volta (era o tranco ao trocar);
+   - nome e peças do look têm altura reservada pela maior das seis, para o
+     conteúdo abaixo do banner não pular a cada troca;
+   - as fotos das peças são pré-carregadas e reaproveitadas (sem piscar).
    ========================================================================== */
 
 (function () {
@@ -31,19 +41,30 @@
   /* celular: só 4 modelos visíveis, fila mais aberta para não se amontoar */
   var POS_CEL = [72, 46, 27, 11, 4, 0];
   var celular = window.matchMedia("(max-width: 560px)");
+  var semMovimento = window.matchMedia("(prefers-reduced-motion: reduce)");
   var ESC = [1, .8, .67, .57, .5, .44];
   var DESF = [0, 0, .8, 1.8, 2.8, 3.8];
   var OPAC = [1, 1, .96, .86, .7, .55];
+  var POUSO = ".9s cubic-bezier(.76, 0, .24, 1)";
 
   var N = LOOKS.length;
   var atual = 0;
+  var frente = -1;
   var els = [];
+
+  var $nome = document.querySelector("#passarelaNome");
+  var $contador = document.querySelector("#passarelaContador");
+  var $corNome = document.querySelector("#passarelaCorNome");
+  var $cores = document.querySelector("#passarelaCores");
+  var $ver = document.querySelector("#passarelaVer");
+  var $preco = document.querySelector("#passarelaPreco");
+  var $aviso = document.querySelector("#passarelaAviso");
+  var $pecas = document.querySelector("#passarelaPecas");
 
   function produto(i) { return buscaProduto(LOOKS[i].produto); }
 
   /* ------------------------------------------------------- montar */
   LOOKS.forEach(function (l, i) {
-    var p = produto(i);
     var b = document.createElement("button");
     b.type = "button";
     b.className = "modelo";
@@ -52,7 +73,7 @@
       (i < 3 ? ' fetchpriority="high"' : ' loading="lazy"') + ' decoding="async">';
     b.addEventListener("click", function () {
       if (arrastou) return;
-      if (i === atual) location.href = "produto.html?id=" + p.id;
+      if (i === atual) location.href = "produto.html?id=" + produto(i).id;
       else ir(i);
     });
     palco.appendChild(b);
@@ -68,18 +89,68 @@
     if (b) ir(parseInt(b.getAttribute("data-look"), 10));
   });
 
+  /* peças do look: dois cartões fixos, só o conteúdo muda */
+  var pecas = ["a", "b"].map(function () {
+    var c = document.createElement("div");
+    c.className = "passarela__peca";
+    c.innerHTML = '<img src="" alt="" width="78" height="96" decoding="async">' +
+      '<div><b></b><small></small><div class="passarela__peca-acoes"></div></div>';
+    $pecas.appendChild(c);
+    return {
+      raiz: c,
+      img: c.querySelector("img"),
+      nome: c.querySelector("b"),
+      info: c.querySelector("small"),
+      acoes: c.querySelector(".passarela__peca-acoes")
+    };
+  });
+
+  /* ------------------------------------------- a modelo que sai da frente */
+  /* Sem isto, ao perder .modelo--frente a animação de flutuar é cortada e a
+     foto salta até 10px de volta ao chão. Aqui ela parte do ponto exato em
+     que estava e desce junto com a troca de posição.                       */
+  function pousar(el) {
+    if (semMovimento.matches) return;
+    var partes = [el.querySelector(".modelo__img"), el.querySelector(".modelo__sombra")];
+    var agora = partes.map(function (n) {
+      var cs = getComputedStyle(n);
+      return { t: cs.transform, o: cs.opacity };
+    });
+    el.classList.remove("modelo--frente");
+    partes.forEach(function (n, k) {
+      n.style.animation = "none";
+      n.style.transition = "none";
+      n.style.transform = agora[k].t === "none" ? "" : agora[k].t;
+      n.style.opacity = agora[k].o;
+    });
+    void el.offsetWidth; // fixa o ponto de partida
+    partes.forEach(function (n) {
+      n.style.transition = "transform " + POUSO + ", opacity " + POUSO;
+      n.style.transform = "";
+      n.style.opacity = "";
+      n.addEventListener("transitionend", function fim(e) {
+        if (e.target !== n) return;
+        n.removeEventListener("transitionend", fim);
+        if (!el.classList.contains("modelo--frente")) limpar(n);
+      });
+    });
+  }
+  function limpar(n) {
+    n.style.animation = n.style.transition = n.style.transform = n.style.opacity = "";
+  }
+
   /* ------------------------------------------------------- pintar */
-  function pintar() {
+  function pintarModelos() {
+    var pos = celular.matches ? POS_CEL : POS;
     els.forEach(function (el, i) {
       var slot = (i - atual + N) % N;
       var p = produto(i);
-      el.style.left = (celular.matches ? POS_CEL : POS)[slot] + "%";
+      el.style.setProperty("--pos", pos[slot]);
       el.style.setProperty("--escala", ESC[slot]);
       el.style.setProperty("--desfoque", DESF[slot] + "px");
       el.style.setProperty("--opacidade", OPAC[slot]);
       el.style.setProperty("--z", 10 - slot);
       el.setAttribute("data-slot", slot);
-      el.classList.toggle("modelo--frente", slot === 0);
       el.setAttribute("data-acao", "Ver a peça");
       el.setAttribute("aria-label", slot === 0
         ? "Look " + (i + 1) + ": " + p.nome + ". Abrir a peça"
@@ -87,62 +158,124 @@
       el.tabIndex = slot === 0 ? 0 : -1;
     });
 
-    var p = produto(atual);
-    document.querySelector("#passarelaNome").textContent = p.nome;
-    document.querySelector("#passarelaContador").textContent = String(atual + 1).padStart(2, "0") + " / " + String(N).padStart(2, "0");
-    Array.prototype.forEach.call(segs.children, function (b, i) { b.setAttribute("aria-current", i === atual ? "true" : "false"); });
-    document.querySelector("#passarelaCorNome").textContent = p.cor || "";
-    document.querySelector("#passarelaCores").innerHTML = (p.cores || []).slice(0, 4).map(function (c) {
-      return '<i style="background:' + c + '"></i>';
-    }).join("");
-    var ver = document.querySelector("#passarelaVer");
-    ver.href = "produto.html?id=" + p.id;
-    document.querySelector("#passarelaPreco").textContent = temPreco(p) ? dinheiro(p.preco) : "Sob consulta";
-    document.querySelector("#passarelaAviso").textContent = "Look " + (atual + 1) + " de " + N + ": " + p.nome;
+    if (frente !== atual) {
+      if (frente > -1) pousar(els[frente]);
+      var nova = els[atual];
+      [nova.querySelector(".modelo__img"), nova.querySelector(".modelo__sombra")].forEach(limpar);
+      nova.classList.add("modelo--frente");
+      frente = atual;
+    }
+  }
+
+  function pintarTextos(i) {
+    var p = produto(i);
+    $nome.textContent = p.nome;
     pintarLado(p);
   }
 
   function pintarLado(p) {
-    var lado = document.querySelector("#passarelaPecas");
-    lado.innerHTML = ["a", "b"].map(function (f, j) {
-      return '<div class="passarela__peca">' +
-        '<img src="' + fotoProduto(p, f) + '" alt="" loading="lazy" width="78" height="96">' +
-        '<div><b>' + LB.escapa(j === 0 ? p.nome : "Outra foto da peça") + '</b>' +
-        '<small>' + LB.escapa(p.cor || "") + ' · ' + LB.precoHTML(p) + '</small>' +
-        '<div class="passarela__peca-acoes">' +
-          (j === 0
-            ? '<button class="passarela__mini" type="button" data-quick="' + p.id + '">Escolher tamanho</button>' +
-              '<a class="passarela__mini" href="produto.html?id=' + p.id + '">Detalhes</a>'
-            : '<button class="passarela__mini" type="button" data-fav="' + p.id + '" aria-pressed="' + (LB.ehFavorito(p.id) ? "true" : "false") + '">' + (LB.ehFavorito(p.id) ? "Favorita ✓" : "Favoritar") + '</button>') +
-        '</div></div></div>';
-    }).join("");
+    pecas.forEach(function (c, j) {
+      var src = fotoProduto(p, j === 0 ? "a" : "b");
+      if (c.img.getAttribute("src") !== src) c.img.setAttribute("src", src);
+      c.nome.textContent = j === 0 ? p.nome : "Outra foto da peça";
+      c.info.innerHTML = LB.escapa(p.cor || "") + " · " + LB.precoHTML(p);
+      var fav = LB.ehFavorito(p.id);
+      c.acoes.innerHTML = j === 0
+        ? '<button class="passarela__mini" type="button" data-quick="' + p.id + '">Escolher tamanho</button>' +
+          '<a class="passarela__mini" href="produto.html?id=' + p.id + '">Detalhes</a>'
+        : '<button class="passarela__mini" type="button" data-fav="' + p.id + '" aria-pressed="' + (fav ? "true" : "false") + '">' + (fav ? "Favorita ✓" : "Favoritar") + '</button>';
+    });
   }
 
-  function ir(i) { atual = (i + N) % N; pintar(); }
+  function pintar() {
+    pintarModelos();
+    var p = produto(atual);
+    pintarTextos(atual);
+    $contador.textContent = String(atual + 1).padStart(2, "0") + " / " + String(N).padStart(2, "0");
+    Array.prototype.forEach.call(segs.children, function (b, i) { b.setAttribute("aria-current", i === atual ? "true" : "false"); });
+    $corNome.textContent = p.cor || "";
+    $cores.innerHTML = (p.cores || []).slice(0, 4).map(function (c) {
+      return '<i style="background:' + c + '"></i>';
+    }).join("");
+    $ver.href = "produto.html?id=" + p.id;
+    $preco.textContent = temPreco(p) ? dinheiro(p.preco) : "Sob consulta";
+    $aviso.textContent = "Look " + (atual + 1) + " de " + N + ": " + p.nome;
+  }
+
+  /* ------------------------------------------- alturas estáveis */
+  /* Mede, antes de pintar a tela, a maior altura do nome e de cada cartão
+     de peça entre os seis looks e reserva esse espaço: assim o que vem
+     abaixo do banner não sobe e desce a cada troca.                       */
+  function estabilizar() {
+    var alvos = [$nome].concat(pecas.map(function (c) { return c.raiz; }));
+    alvos.forEach(function (a) { a.style.minHeight = ""; });
+    var maior = alvos.map(function () { return 0; });
+    for (var i = 0; i < N; i++) {
+      pintarTextos(i);
+      alvos.forEach(function (a, k) { maior[k] = Math.max(maior[k], a.getBoundingClientRect().height); });
+    }
+    pintarTextos(atual);
+    alvos.forEach(function (a, k) { if (maior[k]) a.style.minHeight = Math.ceil(maior[k]) + "px"; });
+  }
+
+  var larguraAntes = window.innerWidth, espera = null;
+  window.addEventListener("resize", function () {
+    if (window.innerWidth === larguraAntes) return; // barra do navegador do celular
+    larguraAntes = window.innerWidth;
+    clearTimeout(espera);
+    espera = setTimeout(estabilizar, 150);
+  }, { passive: true });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(estabilizar);
+
+  /* ------------------------------------------- pré-carregar */
+  function preCarregar() {
+    LOOKS.forEach(function (l, i) {
+      var p = produto(i);
+      ["a", "b"].forEach(function (f) { var im = new Image(); im.decoding = "async"; im.src = fotoProduto(p, f); });
+    });
+  }
+  if ("requestIdleCallback" in window) requestIdleCallback(preCarregar, { timeout: 2500 });
+  else setTimeout(preCarregar, 1200);
+
+  /* ------------------------------------------- navegar */
+  function ir(i) {
+    i = (i + N) % N;
+    if (i === atual) return;
+    atual = i;
+    pintar();
+  }
   function passo(d) { ir(atual + d); }
 
   document.querySelector("#passarelaAnt").addEventListener("click", function () { passo(-1); });
   document.querySelector("#passarelaProx").addEventListener("click", function () { passo(1); });
 
   palco.addEventListener("keydown", function (e) {
+    arrastou = false;
     if (e.key === "ArrowRight") { e.preventDefault(); passo(1); }
     if (e.key === "ArrowLeft") { e.preventDefault(); passo(-1); }
   });
 
   /* ------------------------------------------------- arrastar/deslizar */
-  var x0 = null, arrastou = false;
-  palco.addEventListener("pointerdown", function (e) { x0 = e.clientX; arrastou = false; });
-  palco.addEventListener("pointermove", function (e) { if (x0 !== null && Math.abs(e.clientX - x0) > 12) arrastou = true; });
+  /* "arrastou" só é zerado no próximo toque: o clique sintético que alguns
+     celulares disparam depois do deslize não abre a peça por engano.     */
+  var x0 = null, y0 = 0, arrastou = false;
+  palco.addEventListener("pointerdown", function (e) { x0 = e.clientX; y0 = e.clientY; arrastou = false; });
+  palco.addEventListener("pointermove", function (e) {
+    if (x0 !== null && Math.abs(e.clientX - x0) > 12 && Math.abs(e.clientX - x0) > Math.abs(e.clientY - y0)) arrastou = true;
+  });
   palco.addEventListener("pointerup", function (e) {
     if (x0 === null) return;
     var d = e.clientX - x0; x0 = null;
-    if (Math.abs(d) > 50) passo(d < 0 ? 1 : -1);
-    setTimeout(function () { arrastou = false; }, 0);
+    if (arrastou && Math.abs(d) > 50) passo(d < 0 ? 1 : -1);
   });
   palco.addEventListener("pointercancel", function () { x0 = null; arrastou = false; });
 
-  if (celular.addEventListener) celular.addEventListener("change", pintar);
-  document.addEventListener("lb:catalogo", pintar);
+  function mudouTela() { pintarModelos(); estabilizar(); }
+  if (celular.addEventListener) celular.addEventListener("change", mudouTela);
+  else if (celular.addListener) celular.addListener(mudouTela);
+  document.addEventListener("lb:catalogo", function () { pintar(); estabilizar(); });
   document.addEventListener("lb:favoritos", function () { pintarLado(produto(atual)); });
+
   pintar();
+  estabilizar();
 })();
