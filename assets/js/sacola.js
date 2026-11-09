@@ -262,6 +262,13 @@
 
   /* -------------------------------------------------------- 3. pagamento */
   function desenharPagamentos() {
+    if (LB.catalogoCarregando() && !(checkout().pagamentos && checkout().pagamentos.length)) {
+      // opções da loja ainda chegando: mesmas caixas, como skeleton
+      $("#opcoesPagamento").innerHTML = [0, 1, 2].map(function () {
+        return '<div class="opcao" aria-hidden="true"><span class="opcao__corpo"><b>' + LB.esqTexto("9em") + '</b></span></div>';
+      }).join("") + '<span class="so-leitor" role="status">Carregando formas de pagamento</span>';
+      return;
+    }
     var ops = (checkout().pagamentos && checkout().pagamentos.length) ? checkout().pagamentos : PAGAMENTOS_PADRAO;
     if (est.modo !== "retirada") ops = ops.filter(function (o) { return !/retirada/i.test(o); });
     if (est.pagamento && ops.indexOf(est.pagamento) < 0) est.pagamento = null;
@@ -325,10 +332,16 @@
     var n = LB.estado.carrinho.reduce(function (a, i) { return a + i.qtd; }, 0);
     var s = subtotal(), t = totalConhecido();
     $("#resumoPecas").textContent = n;
-    $("#resumoSub").textContent = s === null ? "a confirmar" : dinheiro(s);
     $("#resumoFrete").textContent = est.modo ? textoFrete(est.frete) : "a escolher";
     $("#rotuloTotal").textContent = t === null ? "Total (a confirmar)" : "Total";
-    $("#resumoTotal").textContent = t === null ? (s === null ? "a confirmar" : dinheiro(s) + " + frete") : dinheiro(t);
+    if (s === null && n && LB.catalogoCarregando()) {
+      // preços reais a caminho: skeleton em vez de "a confirmar" que depois troca
+      $("#resumoSub").innerHTML = LB.esqTexto("5.5em");
+      $("#resumoTotal").innerHTML = LB.esqTexto("6.5em");
+      return;
+    }
+    LB.trocarSuave($("#resumoSub"), s === null ? "a confirmar" : dinheiro(s));
+    LB.trocarSuave($("#resumoTotal"), t === null ? (s === null ? "a confirmar" : dinheiro(s) + " + frete") : dinheiro(t));
   }
 
   /* -------------------------------------------------------- enviar */

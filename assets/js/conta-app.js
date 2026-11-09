@@ -222,9 +222,25 @@ var CONTA_APP = (function () {
   }
 
   /* ------------------------------------------- estados de tela (a11y) */
-  function carregandoHTML(texto) {
-    return '<div class="cx-estado" role="status" aria-live="polite">' +
-      '<span class="cx-estado__giro" aria-hidden="true"></span><p>' + escapa(texto) + "</p></div>";
+  /* Carregando: skeleton com o mesmo formato da lista que vai chegar
+     (cartao de pedido ou de endereco), no lugar do giro generico. O texto
+     continua para leitores de tela. tipo: "pedidos" | "enderecos" | "detalhe" */
+  function carregandoHTML(texto, tipo) {
+    var t = function (l) { return '<span class="esq-texto" style="--l:' + l + '">&nbsp;</span>'; };
+    var corpo;
+    if (tipo === "enderecos") {
+      var end = '<div class="cx-endereco"><div class="cx-endereco__topo">' + t("7em") + "</div>" +
+        "<p>" + t("10em") + "<br>" + t("90%") + "</p>" +
+        '<div class="cx-endereco__acoes">' + t("4em") + " " + t("5em") + "</div></div>";
+      corpo = '<div class="cx-enderecos">' + end + end + "</div>";
+    } else {
+      var ped = '<div class="cx-pedido"><div class="cx-pedido__topo">' +
+          '<span class="cx-pedido__num">' + t("8em") + '</span><span class="cx-pedido__data">' + t("5em") + "</span></div>" +
+        '<div class="cx-pedido__corpo"><div class="cx-pedido__fotos"><span class="esq-bloco" style="width:54px;height:68px;border-radius:3px"></span></div>' +
+          '<div class="cx-pedido__info"><b>' + t("12em") + "</b><span>" + t("8em") + "</span></div></div></div>";
+      corpo = '<div class="cx-pedidos">' + ped + (tipo === "detalhe" ? "" : ped) + "</div>";
+    }
+    return '<div role="status" aria-live="polite"><span class="so-leitor">' + escapa(texto) + '</span><div aria-hidden="true">' + corpo + "</div></div>";
   }
   function erroHTML(texto, recarregar) {
     return '<div class="cx-estado cx-estado--erro" role="alert">' + icone("info") +
@@ -336,7 +352,7 @@ var CONTA_APP = (function () {
       '<h1 id="t-pedidos" class="cx-titulo">Meus pedidos</h1>' +
       '<p>Toque em um pedido para ver as peças, o pagamento e a entrega.</p></div></div>';
 
-    if (S.pedidos === null && !S.erroPedidos) return h + carregandoHTML("Carregando os seus pedidos…") + "</section>";
+    if (S.pedidos === null && !S.erroPedidos) return h + carregandoHTML("Carregando os seus pedidos…", "pedidos") + "</section>";
     if (S.erroPedidos) return h + erroHTML(S.erroPedidos, "pedidos") + "</section>";
 
     if (!S.pedidos.length) {
@@ -406,7 +422,7 @@ var CONTA_APP = (function () {
 
     if (det.carregando) {
       return h + '<h2 id="t-detalhe" class="cx-titulo" style="font-size:clamp(1.4rem,3vw,1.95rem)">Pedido ' + escapa(codigo) + "</h2>" +
-        carregandoHTML("Carregando o pedido…") + "</section>";
+        carregandoHTML("Carregando o pedido…", "detalhe") + "</section>";
     }
     if (det.erro) {
       return h + '<h2 id="t-detalhe" class="cx-titulo" style="font-size:clamp(1.4rem,3vw,1.95rem)">Pedido ' + escapa(codigo) + "</h2>" +
@@ -552,7 +568,7 @@ var CONTA_APP = (function () {
       "confere as peças, a disponibilidade, o frete e o total com você. O status abaixo é atualizado pela loja; " +
       "quando a venda é confirmada, o pedido aparece também em Meus pedidos.</p></div>";
 
-    if (S.atendimentos === null && !S.erroAtendimentos) return h + carregandoHTML("Carregando os seus atendimentos…") + "</section>";
+    if (S.atendimentos === null && !S.erroAtendimentos) return h + carregandoHTML("Carregando os seus atendimentos…", "pedidos") + "</section>";
     if (S.erroAtendimentos) return h + erroHTML(S.erroAtendimentos, "atendimentos") + "</section>";
 
     if (!S.atendimentos.length) {
@@ -607,7 +623,7 @@ var CONTA_APP = (function () {
       '<h1 id="t-end" class="cx-titulo">Endereços</h1>' +
       '<p>O endereço principal é o que vem sugerido nas próximas compras.</p></div></div>';
 
-    if (S.enderecos === null && !S.erroEnderecos) return h + carregandoHTML("Carregando os seus endereços…") + "</section>";
+    if (S.enderecos === null && !S.erroEnderecos) return h + carregandoHTML("Carregando os seus endereços…", "enderecos") + "</section>";
     if (S.erroEnderecos) return h + erroHTML(S.erroEnderecos, "enderecos") + "</section>";
 
     if (!S.enderecos.length) {

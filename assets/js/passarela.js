@@ -225,7 +225,8 @@
       return '<i style="background:' + c + '"></i>';
     }).join("");
     $ver.href = "produto.html?id=" + p.id;
-    $preco.textContent = temPreco(p) ? dinheiro(p.preco) : "Sob consulta";
+    if (!temPreco(p) && LB.catalogoCarregando()) $preco.innerHTML = LB.esqTexto("5em");
+    else LB.trocarSuave($preco, LB.escapa(temPreco(p) ? dinheiro(p.preco) : "Sob consulta"));
     $aviso.textContent = "Look " + (atual + 1) + " de " + N + ": " + p.nome;
   }
 

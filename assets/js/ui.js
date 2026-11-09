@@ -94,8 +94,60 @@ const LB = (function () {
     carrinho: ler(CHAVE_CARRINHO, []),
     favoritos: ler(CHAVE_FAVORITOS, []),
     pagina: "home",
-    frete: null
+    frete: null,
+    /* situacao do catalogo do servidor (preco/estoque):
+       "carregando" -> resposta a caminho (mostra skeleton no preco)
+       "ok"         -> chegou
+       "erro"       -> falhou/demorou demais: segue com "Valor sob consulta"
+       "indisponivel" -> sem fetch ou aberto como arquivo: nem tenta     */
+    catalogo: (window.fetch && location.protocol !== "file:") ? "carregando" : "indisponivel"
   };
+
+  /* ---------------------------------------------------------- SKELETON */
+  function catalogoCarregando() { return estado.catalogo === "carregando"; }
+  /* linha de texto temporaria: mesma altura da linha real */
+  function esqTexto(largura, conteudo) {
+    return '<span class="esq-texto" aria-hidden="true" style="--l:' + largura + '">' + (conteudo || "&nbsp;") + '</span>';
+  }
+  /* preco: enquanto o catalogo nao responde, um skeleton no lugar do
+     "Valor sob consulta" que antes aparecia e depois trocava pelo valor */
+  function precoVisivel(p) {
+    // dentro de .consulta: herda a fonte/altura que o texto final vai ter
+    if (!temPreco(p) && catalogoCarregando()) return '<span class="consulta">' + esqTexto("6.5em") + '</span><span class="so-leitor">Carregando valor</span>';
+    return precoHTML(p);
+  }
+  /* troca o conteudo e, se antes havia skeleton, entra com fade discreto */
+  function trocarSuave(alvo, html) {
+    if (!alvo) return;
+    const tinhaEsq = !!alvo.querySelector(".esq-texto, .esq-bloco");
+    alvo.innerHTML = html;
+    if (tinhaEsq) { alvo.classList.remove("surge"); void alvo.offsetWidth; alvo.classList.add("surge"); }
+  }
+
+  /* ------------------------------------------------------------ FOTOS
+     Cada foto mostra o brilho do skeleton no proprio espaco (reservado
+     por aspect-ratio/width/height) e entra com fade quando termina de
+     carregar. load/error nao borbulham: escuta na fase de captura.     */
+  const CAIXA_FOTO = ".midia, .cartao__midia, .reel";
+  function fotoPronta(img, falhou) {
+    img.classList.add("img-ok");
+    const caixa = img.parentElement && img.parentElement.closest(CAIXA_FOTO);
+    if (!caixa) return;
+    // no cartao, quem manda e a foto principal (a segunda so aparece no hover)
+    if (caixa.classList.contains("cartao__midia") && !img.classList.contains("cartao__a")) return;
+    caixa.classList.add(falhou ? "img-erro" : "img-ok");
+  }
+  (function ligarFotos() {
+    document.addEventListener("load", function (e) { if (e.target && e.target.tagName === "IMG") fotoPronta(e.target, false); }, true);
+    document.addEventListener("error", function (e) { if (e.target && e.target.tagName === "IMG") fotoPronta(e.target, true); }, true);
+    // fotos que ja estavam no HTML nao sao escondidas (podem ja estar na
+    // tela): so as montadas daqui pra frente entram com fade
+    todos("img").forEach(function (img) {
+      img.classList.add("img-ok");
+      if (img.complete && img.getAttribute("src")) fotoPronta(img, img.naturalWidth === 0);
+    });
+    document.documentElement.classList.add("js-img");
+  })();
 
   /* -------------------------------------------------------------- UTIL */
   function el(html) {
@@ -290,13 +342,14 @@ const LB = (function () {
             '<button class="item__remover" type="button" data-remover="' + escapa(it.k) + '">Remover</button>' +
           '</div>' +
         '</div>' +
-        '<div class="item__preco">' + (temPreco(p) ? '<span class="preco">' + dinheiro(p.preco * it.qtd) + '</span>' : precoHTML(p)) + '</div>' +
+        '<div class="item__preco">' + (temPreco(p) ? '<span class="preco">' + dinheiro(p.preco * it.qtd) + '</span>' : precoVisivel(p)) + '</div>' +
       '</div>';
     }).join("") + '</div>';
 
     if (pe) {
       const sub = subtotalCarrinho();
-      pe.innerHTML = (sub !== null ? '<div class="finalizar__sub"><span>Subtotal</span><b>' + dinheiro(sub) + '</b></div>' : '') +
+      pe.innerHTML = (sub !== null ? '<div class="finalizar__sub"><span>Subtotal</span><b>' + dinheiro(sub) + '</b></div>'
+          : catalogoCarregando() ? '<div class="finalizar__sub"><span>Subtotal</span><b>' + esqTexto("5.5em") + '</b></div>' : '') +
         finalizarHTML(true) +
         '<a class="bt bt--vazio bt--largo bt--pequeno" href="loja.html" style="margin-top:.5rem">Continuar comprando</a>';
     }
@@ -449,6 +502,10 @@ const LB = (function () {
   }
 
   /* --------------------------------------------------------- RAPIDA */
+  function notaRapida(p) {
+    if (!temPreco(p) && catalogoCarregando()) return '<span class="nota">' + esqTexto("16em") + '</span>';
+    return '<span class="nota">' + (temPreco(p) ? 'Finalize o pedido com atendimento exclusivo pelo WhatsApp.' : 'O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.') + '</span>';
+  }
   function abrirRapida(id) {
     const p = buscaProduto(id);
     if (!p) return;
@@ -460,8 +517,8 @@ const LB = (function () {
         '<span class="em em--rosa">' + escapa(p.cat) + '</span>' +
         '<h3 style="margin-top:.5rem">' + escapa(p.nome) + '</h3>' +
         '<p class="texto-peq" style="margin-bottom:1rem">Cor ' + escapa(p.cor) + ' · ' + tamanhosDe(p).join(" · ") + '</p>' +
-        '<div class="prod__preco" style="padding-block:.9rem;margin-bottom:1.1rem">' + precoHTML(p) +
-          '<span class="nota">' + (temPreco(p) ? 'Finalize o pedido com atendimento exclusivo pelo WhatsApp.' : 'O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.') + '</span></div>' +
+        '<div class="prod__preco" style="padding-block:.9rem;margin-bottom:1.1rem" data-preco-rapida="' + p.id + '">' + precoVisivel(p) +
+          notaRapida(p) + '</div>' +
         '<div class="prod__grupo"><span class="rotulo">Tamanho</span><div class="tamanhos" data-tams="' + p.id + '">' +
           botoesTamanho(p) +
         '</div></div>' +
@@ -484,6 +541,11 @@ const LB = (function () {
     }).join("");
   }
   function tamsCartaoHTML(p) {
+    // estoque real ainda a caminho: mesmos chips, como skeleton (sem riscar
+    // um tamanho que talvez exista, nem mostrar um que talvez nao exista)
+    if (!p.tamanhos && catalogoCarregando()) {
+      return TAMANHOS.map(function (t) { return '<span class="esq-bloco" aria-hidden="true">' + t + '</span>'; }).join("");
+    }
     return tamanhosDe(p).map(function (t) {
       const fora = situacaoTamanho(p, t) === "esgotado";
       return '<span' + (fora ? ' class="fora" title="Esgotado"' : "") + '>' + t + '</span>';
@@ -514,13 +576,43 @@ const LB = (function () {
      dados.js continua sendo a base (nomes, fotos) e o plano B: sem
      servidor, o site segue funcionando com "Valor sob consulta".        */
   let promessaCatalogo = null;
+  /* limite de rede (nao e espera artificial): se o servidor nao responder
+     nesse tempo, a vitrine segue com "Valor sob consulta" em vez de deixar
+     skeleton travado na tela */
+  const LIMITE_CATALOGO_MS = 9000;
+
+  /* aplica o resultado (ou a falha) em tudo que ja esta na tela */
+  function concluirCatalogo(situacao) {
+    estado.catalogo = situacao;
+    todos("article.cartao[data-id]").forEach(function (a) {
+      const p = buscaProduto(a.getAttribute("data-id"));
+      if (!p) return;
+      trocarSuave(um(".cartao__preco", a), precoHTML(p));
+      trocarSuave(um(".cartao__tams", a), tamsCartaoHTML(p));
+    });
+    todos("[data-preco-rapida]").forEach(function (box) {
+      const p = buscaProduto(box.getAttribute("data-preco-rapida"));
+      if (p) trocarSuave(box, precoHTML(p) + notaRapida(p));
+    });
+    desenharGaveta();
+    document.dispatchEvent(new CustomEvent("lb:catalogo", { detail: { ok: situacao === "ok" } }));
+    return situacao === "ok";
+  }
+
   function sincronizarCatalogo() {
     if (promessaCatalogo) return promessaCatalogo;
-    if (!window.fetch || location.protocol === "file:") return (promessaCatalogo = Promise.resolve(false));
-    promessaCatalogo = fetch("/api/loja/catalogo", { headers: { Accept: "application/json" } })
+    if (!window.fetch || location.protocol === "file:") { estado.catalogo = "indisponivel"; return (promessaCatalogo = Promise.resolve(false)); }
+    let resolver = null;
+    promessaCatalogo = new Promise(function (r) { resolver = r; });
+    // passou do limite: tira o skeleton e mostra o plano B. A requisicao NAO
+    // e cancelada — se a resposta chegar depois, os dados reais ainda entram.
+    const limite = setTimeout(function () { if (catalogoCarregando()) resolver(concluirCatalogo("erro")); }, LIMITE_CATALOGO_MS);
+    function falhou() { clearTimeout(limite); if (catalogoCarregando()) concluirCatalogo("erro"); resolver(false); }
+    fetch("/api/loja/catalogo", { headers: { Accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        if (!d || !d.produtos) return false;
+        clearTimeout(limite);
+        if (!d || !d.produtos) return falhou();
         d.produtos.forEach(function (s) {
           let p = buscaProduto(s.id);
           if (!p) {
@@ -535,17 +627,9 @@ const LB = (function () {
           p.descricao = s.descricao; p.tamanhos = s.tamanhos;
         });
         estado.checkout = d.checkout || null;
-        todos("article.cartao[data-id]").forEach(function (a) {
-          const p = buscaProduto(a.getAttribute("data-id"));
-          if (!p) return;
-          const pr = um(".cartao__preco", a); if (pr) pr.innerHTML = precoHTML(p);
-          const tm = um(".cartao__tams", a); if (tm) tm.innerHTML = tamsCartaoHTML(p);
-        });
-        desenharGaveta();
-        document.dispatchEvent(new CustomEvent("lb:catalogo"));
-        return true;
+        resolver(concluirCatalogo("ok"));
       })
-      .catch(function () { return false; });
+      .catch(falhou);
     return promessaCatalogo;
   }
 
@@ -572,7 +656,7 @@ const LB = (function () {
       '<div class="cartao__txt">' +
         '<span class="cartao__cat">' + escapa(p.cat) + '</span>' +
         '<h3 class="cartao__nome"><a href="produto.html?id=' + p.id + '">' + escapa(p.nome) + '</a></h3>' +
-        '<div class="cartao__preco">' + precoHTML(p) + '</div>' +
+        '<div class="cartao__preco">' + precoVisivel(p) + '</div>' +
         '<div class="cartao__tams" aria-label="Tamanhos">' + tamsCartaoHTML(p) + '</div>' +
         '<div class="cartao__cores" aria-hidden="true">' + p.cores.map(function (c) {
           return '<i style="background:' + c + '"></i>';
@@ -581,11 +665,37 @@ const LB = (function () {
     '</article>';
   }
 
-  function desenharCartoes(seletor, lista) {
+  /* opcoes.manterVisiveis: redesenho por dado novo do servidor — os cartoes
+     que ja estavam a mostra continuam a mostra (sem animar de novo/piscar) */
+  function desenharCartoes(seletor, lista, opcoes) {
     const alvo = typeof seletor === "string" ? um(seletor) : seletor;
     if (!alvo) return;
+    const cfg = opcoes || {};
+    const vinhaDoSkeleton = !!alvo.querySelector(".cartao--esq");
+    const jaVistos = {};
+    if (cfg.manterVisiveis) todos("article.cartao.visivel[data-id]", alvo).forEach(function (a) { jaVistos[a.getAttribute("data-id")] = 1; });
+
     alvo.innerHTML = lista.map(function (p, i) { return cartaoHTML(p, Math.min(i, 5) * 70); }).join("");
+    alvo.removeAttribute("aria-busy");
+
+    if (vinhaDoSkeleton) {
+      // no lugar do skeleton: o que ja esta na tela entra com fade discreto,
+      // sem o deslize de 26px (o espaco ja estava ocupado)
+      const altura = window.innerHeight || 800;
+      todos("article.cartao", alvo).forEach(function (a) {
+        if (a.getBoundingClientRect().top < altura) a.classList.add("visivel", "surge");
+      });
+    }
+    if (cfg.manterVisiveis) {
+      todos("article.cartao[data-id]", alvo).forEach(function (a) { if (jaVistos[a.getAttribute("data-id")]) a.classList.add("visivel"); });
+    }
     observar(alvo);
+  }
+  /* lista de ids desenhada hoje num container (para saber se algo mudou) */
+  function idsDesenhados(seletor) {
+    const alvo = typeof seletor === "string" ? um(seletor) : seletor;
+    if (!alvo) return "";
+    return todos("article.cartao[data-id]", alvo).map(function (a) { return a.getAttribute("data-id"); }).join(",");
   }
 
   /* -------------------------------------------------------------- RODAPE */
@@ -881,10 +991,11 @@ const LB = (function () {
   return {
     ICO: ICO, NAV: NAV, LOJA: LOJA,
     iniciar: iniciar, observar: observar, toast: toast,
-    cartao: cartaoHTML, desenharCartoes: desenharCartoes,
+    cartao: cartaoHTML, desenharCartoes: desenharCartoes, idsDesenhados: idsDesenhados,
+    catalogoCarregando: catalogoCarregando, esqTexto: esqTexto, trocarSuave: trocarSuave,
     adicionar: adicionar, remover: remover, mudarQtd: mudarQtd,
     alternarFavorito: alternarFavorito, ehFavorito: ehFavorito,
-    estado: estado, escapa: escapa, img: img, precoHTML: precoHTML,
+    estado: estado, escapa: escapa, img: img, precoHTML: precoVisivel,
     desenharGaveta: desenharGaveta, atualizarContadores: atualizarContadores,
     abrirRapida: abrirRapida, buscar: buscar,
     catalogo: sincronizarCatalogo, finalizarHTML: finalizarHTML, subtotalCarrinho: subtotalCarrinho,

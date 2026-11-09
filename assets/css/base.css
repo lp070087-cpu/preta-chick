@@ -365,6 +365,79 @@ select.entrada { appearance: none; background-image: linear-gradient(45deg, tran
 .rolagem-x::-webkit-scrollbar { display: none; }
 .rolagem-x > * { scroll-snap-align: start; flex: 0 0 auto; }
 
+/* ---------- 11b. CARREGAMENTO (skeleton) ----------
+   Estruturas temporarias com o MESMO formato do conteudo real: o espaco
+   fica reservado (sem salto de layout) e o brilho e discreto, nos neutros
+   da marca (areia + um toque do dourado lavado). Nada aqui atrasa a
+   pagina: cada skeleton some assim que o dado ou a foto de verdade chega. */
+:root {
+  --esq-fundo:  var(--areia-2);
+  --esq-brilho: rgba(251, 246, 235, .9);   /* --rosa-lavado */
+  --esq-ciclo:  1.6s;
+}
+
+@keyframes esq-brilho { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes esq-surge  { from { opacity: 0; } to { opacity: 1; } }
+
+/* faixa de brilho reaproveitada por todos os skeletons */
+.esq-bloco::after, .esq-texto::after,
+.midia:not(.img-ok)::before, .cartao__midia:not(.img-ok)::before, .reel:not(.img-ok)::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, var(--esq-brilho) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: esq-brilho var(--esq-ciclo) var(--ease-suave) infinite;
+}
+.reel:not(.img-ok)::before { background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.06) 50%, transparent 80%); }
+/* foto com erro: fica o fundo neutro, sem brilho infinito */
+.img-erro::before { display: none !important; }
+
+/* a foto fica por cima do brilho */
+.midia > img, .reel > img { position: relative; }
+
+/* bloco cheio (chips, botoes, fotos sem <img>) */
+.esq-bloco {
+  position: relative; overflow: hidden;
+  background: var(--esq-fundo) !important;
+  border-color: transparent !important;
+  color: transparent !important;
+  user-select: none; pointer-events: none;
+}
+/* linha de texto: ocupa a altura exata da linha real, mas pinta so
+   o miolo — parece texto, e nada abaixo se mexe quando o texto chega */
+.esq-texto {
+  display: inline-block !important; margin: 0 !important; position: relative; overflow: hidden;
+  vertical-align: top; max-width: 100%;
+  width: var(--l, 8em);
+  color: transparent !important;
+  background: linear-gradient(var(--esq-fundo), var(--esq-fundo)) center / 100% 62% no-repeat;
+  border-radius: 3px;
+  user-select: none;
+}
+.esq-texto::after { inset: 19% 0; }
+
+/* casca do topo (faixa + cabecalho) e montada pelo JS: em rede lenta, o
+   espaco dela fica reservado — senao a pagina inteira desce quando ela entra.
+   Alturas medidas: 101px (celular), 139px (faixa em duas linhas), 111px. */
+[data-shell-topo]:empty {
+  min-height: 111px;
+  background: linear-gradient(var(--tinta) 0 38px, #fff 38px);
+}
+@media (max-width: 860px) and (min-width: 701px) { [data-shell-topo]:empty { min-height: 139px; } }
+@media (max-width: 700px) { [data-shell-topo]:empty { min-height: 101px; } }
+
+/* cartao e pagina da peca em skeleton: nada ali e clicavel ainda */
+.cartao--esq, .prod--esq { pointer-events: none; user-select: none; }
+
+/* conteudo de verdade que entrou no lugar do skeleton */
+.surge { animation: esq-surge .42s var(--ease) both; }
+
+/* fotos montadas pelo JS entram com fade discreto quando terminam de
+   carregar (as que ja estao no HTML nao sao escondidas: sem JS, aparecem) */
+.js-img .midia > img:not(.img-ok),
+.js-img .cartao__a:not(.img-ok),
+.js-img .reel > img:not(.img-ok) { opacity: 0; }
+.js-img .midia > img, .js-img .reel > img { transition: transform 1.1s var(--ease), opacity .5s var(--ease); }
+
 /* ---------- 12. MOVIMENTO REDUZIDO ---------- */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -375,4 +448,8 @@ select.entrada { appearance: none; background-image: linear-gradient(45deg, tran
   }
   .rev, .rev--mascara, .midia-rev { opacity: 1 !important; transform: none !important; clip-path: none !important; }
   .sobe-linha > span { transform: none !important; }
+  /* skeleton parado: so o fundo neutro, sem brilho correndo */
+  .esq-bloco::after, .esq-texto::after,
+  .midia::before, .cartao__midia::before, .reel::before { animation: none !important; opacity: 0; }
+  .surge { animation: none !important; }
 }

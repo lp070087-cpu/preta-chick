@@ -27,8 +27,22 @@
       <span aria-current="page" id="migalhaPeca">Peça</span>
     </nav>
 
-    <div class="prod" style="padding-bottom:clamp(2.5rem,6vw,5rem)" id="produto">
-      <!-- preenchido por JS -->
+    <div class="prod prod--esq" style="padding-bottom:clamp(2.5rem,6vw,5rem)" id="produto" aria-busy="true">
+      <!-- skeleton da peça: mesmas proporções da galeria e do bloco de compra; o JS troca pelo conteúdo real -->
+      <div class="prod__galeria" aria-hidden="true">
+        <div class="prod__principal"><div class="midia" style="aspect-ratio:4/5"></div></div>
+        <div class="prod__tiras"><span class="prod__tira"><span class="midia" style="display:block"></span></span><span class="prod__tira"><span class="midia" style="display:block"></span></span></div>
+      </div>
+      <div class="prod__info" aria-hidden="true">
+        <div class="prod__h1-esq"><span class="esq-texto" style="--l:78%">&nbsp;</span></div>
+        <div class="prod__meta"><span class="esq-texto" style="--l:13em">&nbsp;</span></div>
+        <div class="prod__preco"><span class="consulta"><span class="esq-texto" style="--l:7em">&nbsp;</span></span><span class="nota"><span class="esq-texto" style="--l:18em">&nbsp;</span></span></div>
+        <div class="prod__grupo"><span class="rotulo"><span class="esq-texto" style="--l:5em">&nbsp;</span></span><div class="tamanhos"><button type="button" class="esq-bloco" disabled tabindex="-1">PP</button><button type="button" class="esq-bloco" disabled tabindex="-1">P</button><button type="button" class="esq-bloco" disabled tabindex="-1">M</button><button type="button" class="esq-bloco" disabled tabindex="-1">G</button><button type="button" class="esq-bloco" disabled tabindex="-1">GG</button></div></div>
+        <div class="prod__grupo"><span class="rotulo"><span class="esq-texto" style="--l:3em">&nbsp;</span></span><div class="cores"><span class="esq-bloco" style="width:30px;height:30px;border-radius:50%"></span><span class="esq-bloco" style="width:30px;height:30px;border-radius:50%"></span></div></div>
+        <div class="prod__compra"><span class="bt bt--largo esq-bloco">&nbsp;</span></div>
+        <span class="bt bt--largo esq-bloco">&nbsp;</span>
+      </div>
+      <p class="so-leitor" role="status">Carregando a peça…</p>
     </div>
 
     <section class="secao" style="border-top:1px solid var(--linha)">
@@ -39,7 +53,13 @@
         </div>
         <a class="lk lk-seta rev" href="loja.html">Ver a loja <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
-      <div class="grade-produtos" id="gradeRelacionados"></div>
+      <div class="grade-produtos" id="gradeRelacionados" aria-busy="true">
+      <!-- skeleton: some quando o JS desenha as peças -->
+      <article class="cartao cartao--esq" aria-hidden="true"><div class="cartao__midia"></div><div class="cartao__txt"><span class="cartao__cat"><span class="esq-texto" style="--l:5em">&nbsp;</span></span><div class="cartao__nome"><span class="esq-texto" style="--l:86%">&nbsp;</span></div><div class="cartao__preco"><span class="consulta"><span class="esq-texto" style="--l:6.5em">&nbsp;</span></span></div><div class="cartao__tams"><span class="esq-bloco">PP</span><span class="esq-bloco">P</span><span class="esq-bloco">M</span><span class="esq-bloco">G</span><span class="esq-bloco">GG</span></div><div class="cartao__cores"><i class="esq-bloco"></i><i class="esq-bloco"></i></div></div></article>
+      <article class="cartao cartao--esq" aria-hidden="true"><div class="cartao__midia"></div><div class="cartao__txt"><span class="cartao__cat"><span class="esq-texto" style="--l:6.5em">&nbsp;</span></span><div class="cartao__nome"><span class="esq-texto" style="--l:72%">&nbsp;</span></div><div class="cartao__preco"><span class="consulta"><span class="esq-texto" style="--l:6.5em">&nbsp;</span></span></div><div class="cartao__tams"><span class="esq-bloco">PP</span><span class="esq-bloco">P</span><span class="esq-bloco">M</span><span class="esq-bloco">G</span><span class="esq-bloco">GG</span></div><div class="cartao__cores"><i class="esq-bloco"></i><i class="esq-bloco"></i></div></div></article>
+      <article class="cartao cartao--esq" aria-hidden="true"><div class="cartao__midia"></div><div class="cartao__txt"><span class="cartao__cat"><span class="esq-texto" style="--l:4.5em">&nbsp;</span></span><div class="cartao__nome"><span class="esq-texto" style="--l:92%">&nbsp;</span></div><div class="cartao__preco"><span class="consulta"><span class="esq-texto" style="--l:6.5em">&nbsp;</span></span></div><div class="cartao__tams"><span class="esq-bloco">PP</span><span class="esq-bloco">P</span><span class="esq-bloco">M</span><span class="esq-bloco">G</span><span class="esq-bloco">GG</span></div><div class="cartao__cores"><i class="esq-bloco"></i><i class="esq-bloco"></i></div></div></article>
+      <article class="cartao cartao--esq" aria-hidden="true"><div class="cartao__midia"></div><div class="cartao__txt"><span class="cartao__cat"><span class="esq-texto" style="--l:6em">&nbsp;</span></span><div class="cartao__nome"><span class="esq-texto" style="--l:64%">&nbsp;</span></div><div class="cartao__preco"><span class="consulta"><span class="esq-texto" style="--l:6.5em">&nbsp;</span></span></div><div class="cartao__tams"><span class="esq-bloco">PP</span><span class="esq-bloco">P</span><span class="esq-bloco">M</span><span class="esq-bloco">G</span><span class="esq-bloco">GG</span></div><div class="cartao__cores"><i class="esq-bloco"></i><i class="esq-bloco"></i></div></div></article>
+    </div>
     </section>
   </div>
 </main>
@@ -54,16 +74,33 @@
 
   var qs = new URLSearchParams(location.search);
   var id = qs.get("id") || "p01";
-  var p = buscaProduto(id);
+  var alvo = document.querySelector("#produto");
 
-  if (!p) {
-    document.querySelector("#produto").innerHTML =
+  function naoEncontrado() {
+    alvo.removeAttribute("aria-busy");
+    alvo.classList.remove("prod--esq");
+    LB.trocarSuave(alvo,
       '<div class="loja__vazio" style="grid-column:1/-1"><b>Não encontramos essa peça</b>' +
       '<p class="texto-peq" style="margin-bottom:1.4rem">Ela pode ter saído da arara. Veja as novidades da loja.</p>' +
-      '<a class="bt bt--rosa bt--pequeno" href="loja.html">Ver a loja</a></div>';
-    return;
+      '<a class="bt bt--rosa bt--pequeno" href="loja.html">Ver a loja</a></div>');
+    var rel = document.querySelector("#gradeRelacionados");
+    if (rel) { rel.innerHTML = ""; rel.removeAttribute("aria-busy"); }
+    // se o catálogo do servidor chegar atrasado (depois do limite) e trouxer a peça
+    document.addEventListener("lb:catalogo", function tardio(e) {
+      var q = e.detail && e.detail.ok ? buscaProduto(id) : null;
+      if (q) { document.removeEventListener("lb:catalogo", tardio); montar(q); }
+    });
   }
 
+  /* Peças cadastradas só no painel não estão em dados.js: elas chegam com o
+     catálogo do servidor. Enquanto ele responde, o skeleton da peça fica na
+     tela — antes aparecia "Não encontramos essa peça" e depois nada mudava. */
+  var inicial = buscaProduto(id);
+  if (inicial) montar(inicial);
+  else if (LB.catalogoCarregando()) LB.catalogo().then(function () { var q = buscaProduto(id); if (q) montar(q); else naoEncontrado(); });
+  else naoEncontrado();
+
+  function montar(p) {
   document.title = p.nome + " — Preta Chik Moda Praia";
   document.querySelector("#migalhaPeca").textContent = p.nome;
   document.querySelector("#migalhaLoja").textContent = p.cat;
@@ -83,7 +120,9 @@
     return '<span class="selo' + (b === "Novo" ? " selo--rosa" : "") + '">' + LB.escapa(b) + '</span>';
   }).join("");
 
-  document.querySelector("#produto").innerHTML = '' +
+  alvo.removeAttribute("aria-busy");
+  alvo.classList.remove("prod--esq");
+  alvo.innerHTML = '' +
   '<div class="prod__galeria">' +
     '<div class="prod__principal">' +
       '<div class="midia"><img id="fotoPrincipal" src="' + FOTOS[0].src + '" alt="' + LB.escapa(FOTOS[0].alt) + '" width="720" height="900"></div>' +
@@ -168,16 +207,28 @@
       '</div>' +
     '</div>' +
   '</div>';
+  // no lugar do skeleton: fade discreto, sem salto (mesmas proporções)
+  alvo.classList.remove("surge"); void alvo.offsetWidth; alvo.classList.add("surge");
 
   /* ------------------------------------------- preço e tamanhos reais */
   function pintarCompra() {
     var preco = document.querySelector("#prodPreco");
-    preco.innerHTML = LB.precoHTML(p) +
+    var caixa = document.querySelector("[data-tams-produto]");
+    if (!p.tamanhos && LB.catalogoCarregando()) {
+      // preço e estoque reais a caminho: skeleton com as mesmas medidas
+      preco.innerHTML = LB.precoHTML(p) + '<span class="nota">' + LB.esqTexto("18em") + '</span>';
+      caixa.innerHTML = TAMANHOS.map(function (t) {
+        return '<button type="button" class="esq-bloco" disabled aria-hidden="true" tabindex="-1">' + t + '</button>';
+      }).join("");
+      seloTam = null;
+      document.querySelector("#prodEstoque").textContent = "";
+      return;
+    }
+    LB.trocarSuave(preco, LB.precoHTML(p) +
       '<span class="nota">' + (temPreco(p)
         ? "Finalize o pedido com atendimento exclusivo pelo WhatsApp."
-        : "O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.") + '</span>';
-    var caixa = document.querySelector("[data-tams-produto]");
-    caixa.innerHTML = LB.botoesTamanho(p);
+        : "O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.") + '</span>');
+    LB.trocarSuave(caixa, LB.botoesTamanho(p));
     var on = caixa.querySelector("button.on");
     seloTam = on ? on.getAttribute("data-tam") : null;
     pintarEstoque();
@@ -236,10 +287,12 @@
     qtd = Math.max(1, qtd - 1); document.querySelector("#qtdValor").textContent = qtd;
   });
   document.querySelector("#addSacola").addEventListener("click", function () {
+    if (!seloTam && LB.catalogoCarregando()) { LB.toast("Conferindo os tamanhos disponíveis…"); return; }
     if (!seloTam) { LB.toast("Escolha um tamanho disponível"); return; }
     LB.adicionar(p.id, corEscolhida, seloTam, qtd);
   });
   document.querySelector("#comprarAtendimento").addEventListener("click", function () {
+    if (!seloTam && LB.catalogoCarregando()) { LB.toast("Conferindo os tamanhos disponíveis…"); return; }
     if (!seloTam) { LB.toast("Escolha um tamanho disponível"); return; }
     LB.adicionar(p.id, corEscolhida, seloTam, qtd);
     location.href = "sacola.html";
@@ -265,6 +318,7 @@
     irmaos = irmaos.concat(extras).slice(0, 4);
   }
   LB.desenharCartoes("#gradeRelacionados", irmaos.slice(0, 4));
+  }
 })();
 </script>
 </body>

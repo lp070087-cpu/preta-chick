@@ -323,3 +323,7 @@
 .erro404 { min-height: 60svh; display: grid; place-items: center; text-align: center; padding: 4rem 1rem; }
 .erro404 b { font-family: var(--serif); font-size: clamp(4rem, 14vw, 9rem); line-height: 1; color: var(--rosa-lavado); display: block; }
 .erro404 h1 { margin-top: -1.4rem; }
+
+/* skeleton da página da peça: o título temporário usa a mesma fonte e
+   altura do h1 real (sem h1 vazio no HTML, que atrapalharia o SEO) */
+.prod__h1-esq { font-family: var(--serif); font-size: clamp(1.7rem, 3.4vw, 2.5rem); line-height: 1.08; margin-bottom: .55rem; }
