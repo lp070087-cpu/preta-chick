@@ -11,7 +11,7 @@
    - A mesma sacola + os mesmos dados = a mesma chave: clicar de novo não
      cria outra solicitação.
    - Abrir o WhatsApp não prova que a mensagem foi enviada; por isso há
-     "Copiar resumo" e "Abrir o WhatsApp novamente".
+     "Copiar código" e "Abrir WhatsApp".
    ========================================================================== */
 
 (function () {
@@ -21,7 +21,6 @@
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  var WHATS_PADRAO = "5581984023286"; // número oficial (dados.js / ajustes da loja)
   var PAGAMENTOS_PADRAO = ["PIX", "Cartão de crédito", "Cartão de débito", "Dinheiro na retirada"];
   var CHAVE_RASCUNHO = "pc_pedido_rascunho_v1";
 
@@ -32,6 +31,7 @@
   est.passo = 1;
   est.opcoesFrete = [];
   est.enviando = false;
+  var tentativaPedido = null;
 
   function lerRascunho() { try { return JSON.parse(sessionStorage.getItem(CHAVE_RASCUNHO) || "null"); } catch (e) { return null; } }
   function salvarRascunho() {
@@ -57,11 +57,10 @@
   function itensApi() {
     return LB.estado.carrinho.map(function (it) {
       var p = buscaProduto(it.id);
-      return { id: it.id, tam: it.tam, cor: p ? p.cor : it.cor, qtd: it.qtd };
+      return { id: it.id, tam: it.tam, cor: it.cor || (p && p.cor), qtd: it.qtd };
     });
   }
   function checkout() { return (LB.estado && LB.estado.checkout) || {}; }
-  function whatsLoja() { return digitos(checkout().whatsapp) || WHATS_PADRAO; }
 
   /* ---------------------------------------------------------- passos */
   function irPara(n, rolar) {
@@ -98,7 +97,7 @@
       var p = buscaProduto(it.id);
       if (!p) { l.push("Uma peça da sacola não está mais disponível."); return; }
       if (p.ativo === false) l.push(p.nome + " saiu da loja — remova da sacola.");
-      else if (situacaoTamanho(p, it.tam) === "esgotado") l.push(p.nome + " (" + it.tam + ") está esgotado — troque o tamanho ou remova.");
+      else if (situacaoTamanho(produtoDaCor(p, it.cor || p.cor || ""), it.tam) === "esgotado") l.push(p.nome + " (" + it.tam + ") está esgotado — troque o tamanho ou remova.");
     });
     return l;
   }
@@ -128,12 +127,12 @@
     LISTA.innerHTML = itens.map(function (it) {
       var p = buscaProduto(it.id);
       if (!p) return "";
-      var esg = situacaoTamanho(p, it.tam) === "esgotado";
+      var esg = situacaoTamanho(produtoDaCor(p, it.cor || p.cor || ""), it.tam) === "esgotado";
       return '<div class="item">' +
         '<div class="item__foto"><div class="midia"><img src="' + fotoProduto(p, "a") + '" alt="' + LB.escapa(p.nome) + '" width="720" height="900"></div></div>' +
         '<div class="item__corpo">' +
           '<h3><a href="produto.html?id=' + p.id + '">' + LB.escapa(p.nome) + '</a></h3>' +
-          '<p class="item__atrib">Cor ' + LB.escapa(p.cor || it.cor) + ' · Tam. ' + LB.escapa(it.tam) + '</p>' +
+          '<p class="item__atrib">Cor ' + LB.escapa(it.cor || p.cor) + ' · Tam. ' + LB.escapa(it.tam) + '</p>' +
           (esg ? '<span class="item__aviso">Este tamanho está esgotado</span>' : '') +
           '<div class="item__linha">' +
             '<span class="passo">' +
@@ -311,7 +310,7 @@
     $("#revisao").innerHTML = '<div class="revisao">' +
       '<div class="revisao__bloco"><h3>Produtos</h3>' + LB.estado.carrinho.map(function (it) {
         var p = buscaProduto(it.id) || { nome: it.id };
-        return '<div class="revisao__linha"><span>' + it.qtd + '× ' + LB.escapa(p.nome) + '<small>Tam. ' + LB.escapa(it.tam) + ' · Cor ' + LB.escapa(p.cor || it.cor) + '</small></span>' +
+        return '<div class="revisao__linha"><span>' + it.qtd + '× ' + LB.escapa(p.nome) + '<small>Tam. ' + LB.escapa(it.tam) + ' · Cor ' + LB.escapa(it.cor || p.cor) + '</small></span>' +
           '<b>' + (temPreco(p) ? dinheiro(p.preco * it.qtd) : "a confirmar") + '</b></div>';
       }).join("") + '</div>' +
       '<div class="revisao__bloco"><h3>Entrega</h3><p>' + (est.modo === "retirada" ? "Retirada na loja" : LB.escapa(est.frete ? est.frete.nome : "Envio")) + '</p>' +
@@ -350,33 +349,14 @@
   }
   function chaveDoEnvio() {
     /* mesma sacola + mesmos dados -> mesma chave (sem solicitação duplicada) */
-    var ass = assinatura(), guardado = null;
-    try { guardado = JSON.parse(sessionStorage.getItem("pc_pedido_chave") || "null"); } catch (e) {}
+    var ass = assinatura(), guardado = tentativaPedido;
+    try { guardado = JSON.parse(sessionStorage.getItem("pc_pedido_chave") || "null") || guardado; } catch (e) {}
     if (guardado && guardado.ass === ass) return guardado.chave;
     var a = new Uint8Array(12); (window.crypto || window.msCrypto).getRandomValues(a);
     var chave = "w" + Array.prototype.map.call(a, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
-    try { sessionStorage.setItem("pc_pedido_chave", JSON.stringify({ ass: ass, chave: chave })); } catch (e) {}
+    tentativaPedido = { ass: ass, chave: chave };
+    try { sessionStorage.setItem("pc_pedido_chave", JSON.stringify(tentativaPedido)); } catch (e) {}
     return chave;
-  }
-
-  function mensagemLocal() {
-    /* Só usada se o servidor estiver fora do ar: mesmo formato, sem número de pedido. */
-    var l = ["*PRETA CHIK — NOVO PEDIDO*", "", "Olá! Montei meu pedido pelo site da Preta Chik e gostaria de finalizar com atendimento exclusivo.", "", "*Meus produtos:*"];
-    LB.estado.carrinho.forEach(function (it, i) {
-      var p = buscaProduto(it.id) || { nome: it.id };
-      l.push((i + 1) + ". " + p.nome, "Tamanho: " + it.tam, "Cor: " + (p.cor || it.cor), "Quantidade: " + it.qtd,
-        "Valor: " + (temPreco(p) ? dinheiro(p.preco) : "a confirmar com a loja"), "");
-    });
-    var e = est.endereco;
-    l.push("Entrega: " + (est.modo === "retirada" ? "Retirada na loja" : "Envio"));
-    if (e) l.push("Endereço: " + e.rua + ", " + e.numero + (e.complemento ? " — " + e.complemento : "") + " · " + e.bairro + " · " + e.cidade + "/" + e.uf + " · CEP " + e.cep);
-    l.push("Frete: " + (est.modo === "retirada" ? "sem frete (retirada)" : textoFrete(est.frete)));
-    l.push("Pagamento preferido: " + est.pagamento);
-    var s = subtotal(), t = totalConhecido();
-    l.push("Subtotal: " + (s === null ? "a confirmar" : dinheiro(s)), "Total: " + (t === null ? "a confirmar" : dinheiro(t)), "Cliente: " + est.contato.nome);
-    if (est.observacao) l.push("Observação: " + est.observacao);
-    l.push("", "Gostaria de confirmar a disponibilidade e finalizar meu pedido. Obrigada!");
-    return l.join("\n");
   }
 
   $("#finalizarWhats").addEventListener("click", function () {
@@ -385,54 +365,59 @@
     if (!validarEntrega(true)) { irPara(2, true); return; }
     if (!est.pagamento) { irPara(3, true); return; }
     est.enviando = true;
-    var bt = $("#finalizarWhats"); bt.disabled = true; bt.querySelector("span").textContent = "Preparando seu pedido…";
+    var bt = $("#finalizarWhats"); bt.disabled = true; bt.querySelector("span").textContent = "Salvando seu pedido…";
     $("#erro4").textContent = "";
     /* A aba é aberta já no clique para o navegador não bloquear como pop-up. */
     var janela = null;
     try { janela = window.open("", "_blank"); } catch (x) { janela = null; }
-    if (janela) { try { janela.document.write("<p style='font-family:sans-serif;padding:2rem'>Abrindo o WhatsApp da Preta Chik…</p>"); } catch (x) {} }
+    if (janela) { try { janela.document.write("<p style='font-family:sans-serif;padding:2rem'>Salvando seu pedido na Preta Chik…</p>"); } catch (x) {} }
     var corpo = {
       chave: chaveDoEnvio(), itens: itensApi(), nome: est.contato.nome, fone: est.contato.fone,
       entrega: est.modo === "retirada" ? { tipo: "retirada" } : { tipo: "envio", opcaoId: est.frete && est.frete.id !== "pendente" ? est.frete.id : null },
       endereco: est.endereco, pagamento: est.pagamento, observacao: est.observacao
     };
     api("/api/loja/pedidos-whatsapp", corpo).then(function (d) {
-      abrir(janela, d.url);
-      confirmar({ codigo: d.codigo, url: d.url, mensagem: d.mensagem, registrado: true, conta: d.vinculadoAConta });
-    }).catch(function (err) {
-      var dd = err.dados || {};
-      if (err.status && err.status < 500 && err.status !== 404) {
-        /* erro de dados (peça esgotada, campo inválido): corrige antes de enviar */
-        if (janela) try { janela.close(); } catch (x) {}
-        $("#erro4").textContent = err.message + (dd.problemas ? " " + dd.problemas.map(function (p) { return (buscaProduto(p.id) || {}).nome + (p.tam ? " (" + p.tam + ")" : "") + ": " + p.motivo; }).join("; ") : "");
-        return;
+      if (!d.ok || !/^PC-[A-Z0-9]{6}$/.test(d.codigo || "") || !/^\d{10,15}$/.test(d.whatsapp || "")) {
+        throw new Error("Pedido sem confirmação do servidor.");
       }
-      /* servidor indisponível: ainda abre a conversa, sem fingir que registrou */
-      var msg = mensagemLocal();
-      var url = "https://wa.me/" + whatsLoja() + "?text=" + encodeURIComponent(msg);
-      abrir(janela, url);
-      confirmar({ codigo: null, url: url, mensagem: msg, registrado: false });
-    }).then(function () {
-      est.enviando = false; bt.disabled = false; bt.querySelector("span").textContent = "Finalizar pedido pelo WhatsApp";
+      // A mensagem é montada só com o código, inclusive se uma versão antiga
+      // da API responder durante a troca de versão.
+      var mensagem = "Olá! Montei meu pedido pelo site da Preta Chik e gostaria de finalizar minha compra.\n\n" +
+        "Código do pedido: " + d.codigo + "\n\nPoderia me ajudar a concluir o atendimento?";
+      var url = "https://wa.me/" + d.whatsapp + "?text=" + encodeURIComponent(mensagem);
+      confirmar({ codigo: d.codigo, url: url, mensagem: mensagem, conta: d.vinculadoAConta });
+      if (janela) {
+        try { janela.opener = null; janela.location.replace(url); } catch (x) { janela.close(); }
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    }).catch(function (err) {
+      if (janela) try { janela.close(); } catch (x) {}
+      var dd = err.dados || {};
+      var falhaTemporaria = !err.status || err.status >= 500 || err.status === 404;
+      $("#erro4").textContent = falhaTemporaria
+        ? "Não conseguimos confirmar o registro do pedido agora. Seus dados foram mantidos. Tente novamente."
+        : err.message + (dd.problemas ? " " + dd.problemas.map(function (p) {
+          return (buscaProduto(p.id) || {}).nome + (p.tam ? " (" + p.tam + ")" : "") + ": " + p.motivo + ".";
+        }).join(" ") : "");
+      bt.querySelector("span").textContent = falhaTemporaria ? "Tentar novamente" : "Finalizar pelo WhatsApp";
+    }).finally(function () {
+      est.enviando = false;
+      bt.disabled = false;
+      if (bt.querySelector("span").textContent === "Salvando seu pedido…") bt.querySelector("span").textContent = "Finalizar pelo WhatsApp";
     });
   });
-
-  function abrir(janela, url) {
-    if (janela) { try { janela.location.href = url; return; } catch (x) {} }
-    var w = null; try { w = window.open(url, "_blank"); } catch (x) {}
-    if (!w) location.href = url;
-  }
 
   function confirmar(r) {
     CONF.innerHTML = '<div class="confirmacao">' +
       '<span class="confirmacao__ico" aria-hidden="true">' + LB.ICO.zap + '</span>' +
-      '<span class="em em--rosa">Pedido encaminhado</span>' +
-      '<h2 class="t-1">' + (r.codigo ? "Pedido #" + LB.escapa(r.codigo) : "Pedido pronto para envio") + '</h2>' +
-      '<p class="texto-medio">Abrimos o WhatsApp oficial da Preta Chik com o seu pedido. <b>Toque em enviar</b> na conversa para a nossa equipe começar o atendimento.</p>' +
-      '<p class="texto-peq">O pedido ainda não está pago nem confirmado: a equipe confere disponibilidade, frete e total com você.' +
-        (r.registrado ? (r.conta ? ' Você acompanha o status em <a class="lk" href="conta.html#atendimentos">Minha conta</a>.' : '') : ' (Não conseguimos registrar o pedido no sistema agora, mas a equipe atende normalmente pela conversa.)') + '</p>' +
-      '<a class="bt bt--zap bt--largo" href="' + LB.escapa(r.url) + '" target="_blank" rel="noopener">' + LB.ICO.zap + '<span>Abrir o WhatsApp novamente</span></a>' +
-      '<button class="bt bt--vazio bt--largo" type="button" id="copiarResumo">Copiar resumo do pedido</button>' +
+      '<span class="em em--rosa">Pedido salvo</span>' +
+      '<h2 class="t-1">Pedido ' + LB.escapa(r.codigo) + '</h2>' +
+      '<p class="texto-medio">Envie o código no WhatsApp para a equipe localizar seu pedido e ajudar a concluir a compra.</p>' +
+      '<p class="texto-peq">A equipe confirma disponibilidade, frete e total com você.' +
+        (r.conta ? ' Acompanhe em <a class="lk" href="conta.html#atendimentos">Minha conta</a>.' : '') + '</p>' +
+      '<a class="bt bt--zap bt--largo" href="' + LB.escapa(r.url) + '" target="_blank" rel="noopener">' + LB.ICO.zap + '<span>Abrir WhatsApp</span></a>' +
+      '<button class="bt bt--vazio bt--largo" type="button" id="copiarCodigo">Copiar código do pedido</button>' +
       '<p class="texto-peq" id="copiado" aria-live="polite"></p>' +
       '<details class="confirmacao__msg"><summary>Ver a mensagem</summary><pre>' + LB.escapa(r.mensagem) + '</pre></details>' +
       '<div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin-top:.4rem">' +
@@ -441,19 +426,20 @@
       '</div>' +
     '</div>';
     CONF.classList.remove("oculto");
-    $("#copiarResumo").addEventListener("click", function () {
-      var ok = function () { $("#copiado").textContent = "Resumo copiado. Cole na conversa do WhatsApp da loja."; };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(r.mensagem).then(ok, copiaManual);
+    $("#copiarCodigo").addEventListener("click", function () {
+      var ok = function () { $("#copiado").textContent = "Código copiado."; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(r.codigo).then(ok, copiaManual);
       else copiaManual();
       function copiaManual() {
-        var t = document.createElement("textarea"); t.value = r.mensagem; document.body.appendChild(t); t.select();
-        try { document.execCommand("copy"); ok(); } catch (x) { $("#copiado").textContent = "Selecione a mensagem abaixo e copie."; }
+        var t = document.createElement("textarea"); t.value = r.codigo; document.body.appendChild(t); t.select();
+        try { document.execCommand("copy"); ok(); } catch (x) { $("#copiado").textContent = "Selecione o código acima e copie."; }
         t.remove();
       }
     });
     $("#novaSacola").addEventListener("click", function () {
       LB.estado.carrinho = []; LB.gravarCarrinho(); LB.atualizarContadores(); LB.desenharGaveta();
       document.dispatchEvent(new CustomEvent("lb:carrinho"));
+      tentativaPedido = null;
       try { sessionStorage.removeItem("pc_pedido_chave"); } catch (x) {}
       LB.toast("Sacola esvaziada");
     });

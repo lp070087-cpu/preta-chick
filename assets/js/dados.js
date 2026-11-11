@@ -198,6 +198,17 @@ function precoHTML(p) {
   return de + '<span class="preco">' + dinheiro(p.preco) + "</span>";
 }
 
+function coresDisponiveis(p) {
+  if (!p.tamanhos) return [p.cor || ""];
+  return Array.from(new Set(p.tamanhos.map(function (v) { return v.cor || p.cor || ""; })));
+}
+function produtoDaCor(p, cor) {
+  if (!p.tamanhos) return p;
+  return Object.assign({}, p, { tamanhos: p.tamanhos.filter(function (v) {
+    return (v.cor || p.cor || "") === cor;
+  }) });
+}
+
 /* Situação de um tamanho: "ok" | "esgotado" | "consulta" (estoque não
    controlado — a loja confirma no atendimento). Antes do catálogo do
    servidor chegar, vale a lista INDISPONIVEIS acima. */

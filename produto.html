@@ -159,11 +159,8 @@
 
     '<div class="prod__grupo">' +
       '<span class="rotulo">Cor</span>' +
-      '<div class="cores" data-cores-produto>' +
-        p.cores.map(function (c, i) {
-          return '<button type="button" data-cor="' + c + '" style="background:' + c + '" aria-label="Cor ' + c + '"' + (i === 0 ? ' class="on"' : '') + '></button>';
-        }).join("") +
-      '</div>' +
+      '<select class="entrada" id="corProduto" aria-label="Cor"></select>' +
+    '</div>' +
     '</div>' +
 
     '<div class="prod__compra">' +
@@ -228,24 +225,43 @@
       '<span class="nota">' + (temPreco(p)
         ? "Finalize o pedido com atendimento exclusivo pelo WhatsApp."
         : "O valor é informado pela loja no atendimento exclusivo pelo WhatsApp.") + '</span>');
-    LB.trocarSuave(caixa, LB.botoesTamanho(p));
+    var cores = coresDisponiveis(p);
+    if (cores.indexOf(corEscolhida) < 0) corEscolhida = cores[0] || "";
+    var seletor = document.querySelector("#corProduto");
+    seletor.innerHTML = cores.map(function (cor) {
+      return '<option value="' + LB.escapa(cor) + '">' + LB.escapa(cor || "Cor da peça") + '</option>';
+    }).join("");
+    seletor.disabled = cores.length < 2;
+    seletor.value = corEscolhida;
+    pintarTamanhos();
+  }
+  function pintarTamanhos() {
+    var caixa = document.querySelector("[data-tams-produto]");
+    var selecionado = produtoDaCor(p, corEscolhida);
+    LB.trocarSuave(caixa, LB.botoesTamanho(selecionado));
     var on = caixa.querySelector("button.on");
     seloTam = on ? on.getAttribute("data-tam") : null;
     pintarEstoque();
-    var esg = esgotado(p);
+    var esg = !seloTam;
     document.querySelector("#addSacola").disabled = esg;
+    document.querySelector("#comprarAtendimento").disabled = esg;
     document.querySelector("#addSacola").textContent = esg ? "Esgotado" : "Adicionar à sacola";
   }
   function pintarEstoque() {
     var el = document.querySelector("#prodEstoque");
-    if (!seloTam) { el.textContent = esgotado(p) ? "Todos os tamanhos estão esgotados no momento." : ""; return; }
-    var sit = situacaoTamanho(p, seloTam), qtdEst = null;
-    (p.tamanhos || []).forEach(function (t) { if (t.tam === seloTam) qtdEst = t.estoque; });
+    var selecionado = produtoDaCor(p, corEscolhida);
+    if (!seloTam) { el.textContent = "Nenhum tamanho disponível nesta cor."; return; }
+    var sit = situacaoTamanho(selecionado, seloTam), qtdEst = null;
+    (selecionado.tamanhos || []).forEach(function (t) { if (t.tam === seloTam) qtdEst = t.estoque; });
     el.textContent = sit === "ok" ? (qtdEst <= 3 ? "Últimas " + qtdEst + " unidades no tamanho " + seloTam + "." : "Disponível no tamanho " + seloTam + ".")
       : sit === "consulta" ? "Disponibilidade do tamanho " + seloTam + " confirmada pela loja no atendimento." : "";
   }
   pintarCompra();
   document.addEventListener("lb:catalogo", pintarCompra);
+  document.querySelector("#corProduto").addEventListener("change", function (e) {
+    corEscolhida = e.currentTarget.value;
+    pintarTamanhos();
+  });
 
   /* --------------------------------------------------------- interacoes */
   function trocarFoto(i) {
@@ -272,12 +288,6 @@
       return;
     }
 
-    var c = e.target.closest("[data-cores-produto] [data-cor]");
-    if (c) {
-      var g2 = c.parentNode; var bs2 = g2.querySelectorAll("button");
-      for (var j = 0; j < bs2.length; j++) bs2[j].classList.remove("on");
-      c.classList.add("on");
-    }
   });
 
   document.querySelector("#mais").addEventListener("click", function () {

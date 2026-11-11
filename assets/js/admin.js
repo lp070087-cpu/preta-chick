@@ -500,7 +500,7 @@
     new URLSearchParams(busca).forEach((v, k) => { q[k] = v; });
     let mod = MODULOS.find((m) => m.id === partes[0]);
     if (!partes[0]) {
-      mod = MODULOS.find((m) => pode(m.rec));
+      mod = MODULOS.find((m) => m.id === "pedidos" && pode(m.rec)) || MODULOS.find((m) => pode(m.rec));
       if (mod) history.replaceState(null, "", "#" + mod.id);
     }
     geracao++;
@@ -645,7 +645,7 @@
       `<div class="filtros">
         ${chips("Filtrar por status", [["", "Todos"]].concat(Object.keys(STATUS_AT).map((k) => [k, STATUS_AT[k]])), status, "data-status")}
         <form class="busca" role="search" id="busca-at">
-          <label class="so-leitor" for="busca-at-q">Buscar atendimento</label>
+          <label class="so-leitor" for="busca-at-q">Buscar pedido por código</label>
           <input id="busca-at-q" class="entrada" type="search" name="q" value="${esc(busca)}" placeholder="Código, nome ou telefone">
           <button type="submit" class="btn btn--peq">Buscar</button>
         </form>
@@ -663,7 +663,7 @@
         return;
       }
       alvo.innerHTML = `<p class="texto-peq">${plural(l.length, "pedido", "pedidos")}</p>` + tabela(
-        ["Número", "Data", "Cliente", "Peças", "Subtotal", "Entrega", "Frete", "Pagamento preferido", "Status", "Responsável"],
+        ["Código", "Data", "Cliente", "Peças", "Subtotal", "Entrega", "Frete", "Pagamento preferido", "Status", "Responsável", "Ação"],
         l.map((a) => [
           `<a class="lk-forte" href="#atendimento/${enc(a.id)}">${esc(a.code)}</a>${a.order_code ? '<br><span class="texto-peq">venda confirmada</span>' : ""}`,
           esc(dataHora(a.created_at)),
@@ -675,6 +675,7 @@
           esc(a.payment_pref || "—"),
           tagAt(a.status),
           esc(a.atendente || "—"),
+          `<a class="btn btn--vazio btn--peq" href="#atendimento/${enc(a.id)}">Ver pedido</a>`,
         ]), "Pedidos pelo WhatsApp");
     });
   }
@@ -693,6 +694,14 @@
 
   function chaveLinha(l) { return [l.variant_id, l.qtd, l.preco_unit].join("|"); }
 
+  function fotoItem(l) {
+    const id = String(l.product_id || "");
+    const foto = l.foto || (produtoPorId(id) && fotoProduto(produtoPorId(id))) ||
+      (/^p(?:0[1-9]|1[0-6])$/.test(id) ? "assets/img/card/" + id + "-a.jpg" : "");
+    const segura = urlSegura(foto) || (/^\/?assets\/img\/[\w./%-]+$/.test(foto) && !foto.includes("..") ? foto : "");
+    return segura ? `<img class="foto-item-pedido" src="${esc(segura)}" alt="" width="42" height="52" loading="lazy">` : "";
+  }
+
   function listaItens(itens, o) {
     o = o || {};
     if (!itens || !itens.length) return vazio("Nenhuma peça.");
@@ -707,7 +716,7 @@
       }
       const mudou = orig && !orig.has(chaveLinha(l));
       return `<li class="item${mudou ? " item--mudou" : ""}">
-        <div class="item-cab"><span class="item-nome">${esc(l.nome)}</span>${mudou ? tag("alterado", "rosa") : ""}</div>
+        <div class="item-cab">${fotoItem(l)}<span class="item-nome">${esc(l.nome)}</span>${mudou ? tag("alterado", "rosa") : ""}</div>
         <div class="item-info">Tam. ${esc(l.tam)}${l.cor ? " · " + esc(l.cor) : ""} · ${esc(l.qtd)} × ${esc(brl(l.preco_unit))}</div>
         <div class="item-total">${l.preco_unit == null ? tag("sem valor", "alerta") : esc(brl(l.preco_unit * l.qtd))}</div>
         ${estTxt}
@@ -814,7 +823,7 @@
         if (preco != null) item.preco_manual = preco;
         return item;
       });
-      const r = await api("PUT", "atendimentos/" + enc(AT.id) + "/itens", { itens });
+      const r = await api("PUT", "atendimentos/" + enc(AT.id) + "/itens", { itens, atualizadoEm: AT.dados.atendimento.updated_at });
       AT.dados = r; AT.edicao = null; AT.cotacao = null;
       desenharAt($("#at-det"));
       aviso("Carrinho atualizado.");
@@ -868,9 +877,9 @@
           <p class="det-meta">${tagAt(a.status)} <span>Aberto em ${esc(dataHora(a.created_at))}</span> <span>Atendente: ${esc(a.atendente || "ninguém assumiu")}</span>${a.vendedor ? ` <span>Vendido por: ${esc(a.vendedor)}</span>` : ""}</p>
         </div>
         <div class="det-acoes">
-          ${!encerrado && !meu ? '<button type="button" class="btn" data-acao="assumir">Assumir atendimento</button>' : ""}
+          ${editavel && !meu ? '<button type="button" class="btn" data-acao="assumir">Assumir atendimento</button>' : ""}
           <button type="button" class="btn btn--vazio" data-acao="resumo">Resumo para WhatsApp</button>
-          ${!encerrado ? '<button type="button" class="btn btn--vazio" data-acao="status">Mudar status</button>' : ""}
+          ${editavel ? '<button type="button" class="btn btn--vazio" data-acao="status">Mudar status</button>' : ""}
         </div>
       </header>
       ${comPedido ? `<div class="faixa faixa--ok">Pedido <a class="lk-forte" href="#pedidos/${enc(a.order_id)}">${esc(a.order_code || "gerado")}</a> gerado a partir deste atendimento. Pagamento, envio e status seguem pelo pedido.</div>` : ""}
@@ -902,10 +911,10 @@
             </dl>
             ${editavel ? `
               <div class="sub-grade">
-                <form id="form-desconto" class="form-linha" novalidate>
+                ${pode("financeiro") ? `<form id="form-desconto" class="form-linha" novalidate>
                   ${campoReais("Desconto manual (R$)", "desconto", a.discount_cents || null)}
                   <button type="submit" class="btn btn--vazio btn--peq">Aplicar desconto</button>
-                </form>
+                </form>` : ""}
                 <form id="form-cupom" class="form-linha" novalidate>
                   ${campo("Cupom", "cupom", { valor: a.coupon_code || "", attrs: 'autocapitalize="characters" autocomplete="off"' })}
                   <button type="submit" class="btn btn--vazio btn--peq">Aplicar cupom</button>
@@ -1087,14 +1096,12 @@
 
     const st = bt("status");
     if (st) st.addEventListener("click", () => {
-      const comPedido = !!a.order_id;
-      const lista = comPedido ? { cancelado: STATUS_AT.cancelado } : STATUS_AT;
+      const lista = Object.fromEntries(["aguardando_atendimento", "em_atendimento", "aguardando_confirmacao", "cancelado"].map((k) => [k, STATUS_AT[k]]));
       dialogo({
         titulo: "Mudar status do atendimento",
         ok: "Mudar status",
         corpo: `<p>Status atual: ${tagAt(a.status)}</p>
-          ${comPedido ? '<p class="faixa faixa--alerta">Este atendimento já tem pedido. Aqui só é possível cancelar — isso cancela também o pedido e devolve o estoque controlado. Para outros status, use a tela do pedido.</p>' : ""}
-          ${campo("Novo status", "status", { tipo: "select", opcoes: opcoes(lista, comPedido ? "cancelado" : a.status) })}
+          ${campo("Novo status", "status", { tipo: "select", opcoes: opcoes(lista, a.status) })}
           ${campo("Motivo (opcional)", "motivo", { tipo: "textarea", linhas: 2 })}`,
         aoConfirmar: async (dd) => {
           if (dd.status === a.status) throw erroCampo("Escolha um status diferente do atual.", "status");
@@ -1113,7 +1120,7 @@
       aplicar(await api("PUT", base + "/valores", { cupom: dd.cupom.toUpperCase() }), "Cupom aplicado.");
     });
     const rc = bt("remover-cupom");
-    if (rc) rc.addEventListener("click", () => executar(rc, async () => aplicar(await api("PUT", base + "/valores", { cupom: "" }), "Cupom removido. O desconto do cupom continua até você alterar o desconto manual.")));
+    if (rc) rc.addEventListener("click", () => executar(rc, async () => aplicar(await api("PUT", base + "/valores", { cupom: "" }), "Cupom e desconto aplicado por ele removidos.")));
 
     aoEnviar($("#form-cotar", alvo), async (dd) => {
       if (digitos(dd.cep).length !== 8) throw erroCampo("CEP com 8 números.", "cep");
@@ -1156,8 +1163,8 @@
         corpo.endereco = end;
       }
       dialogo({
-        titulo: "Gerar pedido?",
-        ok: "Gerar pedido",
+        titulo: "Confirmar venda?",
+        ok: "Confirmar venda",
         corpo: `<p>Será criado um pedido de <strong>${esc(brl(tot.total))}</strong> para <strong>${esc(a.name || "a cliente")}</strong>, aguardando pagamento.</p>
           <p class="texto-peq">O estoque controlado das peças é baixado agora. Depois disso, alterações são feitas pelo pedido.</p>`,
         aoConfirmar: async () => {
@@ -1208,12 +1215,12 @@
   function telaPedidos(el, args, q) {
     if (args[0]) return detalhePedido(el, args[0]);
     const f = { status: q.status || "", canal: q.canal || "", q: q.q || "" };
-    el.innerHTML = cabecalho("Pedidos", "Pedidos do site e do atendimento") +
+    el.innerHTML = cabecalho("Pedidos", "Encontre o pedido pelo código recebido no WhatsApp e acompanhe o atendimento até a entrega.") +
       `<form class="filtros filtros--form" id="filtro-ped" role="search">
-        ${campo("Status", "status", { tipo: "select", opcoes: opcoes(STATUS_PED, f.status, "Todos") })}
+        ${campo("Buscar pedido por código", "q", { tipo: "search", valor: f.q, ph: "Ex.: PC-RFKQDJ", attrs: 'autocapitalize="characters" autocomplete="off"' })}
+        ${campo("Status", "status", { tipo: "select", opcoes: opcoes(Object.assign({}, STATUS_AT, STATUS_PED), f.status, "Todos") })}
         ${campo("Canal", "canal", { tipo: "select", opcoes: opcoes(CANAIS, f.canal, "Todos") })}
-        ${campo("Buscar", "q", { tipo: "search", valor: f.q, ph: "Código, nome ou telefone" })}
-        <button type="submit" class="btn btn--peq">Filtrar</button>
+        <button type="submit" class="btn btn--peq">Buscar</button>
       </form>
       <div id="lista-ped"></div>`;
     $("#filtro-ped", el).addEventListener("submit", (ev) => { ev.preventDefault(); irPara(hashCom("pedidos", dadosForm(ev.currentTarget))); });
@@ -1223,18 +1230,23 @@
       const l = d.pedidos || [];
       if (!l.length) { alvo.innerHTML = vazio(f.status || f.canal || f.q ? "Nenhum pedido com esses filtros." : "Nenhum pedido ainda."); return; }
       alvo.innerHTML = `<p class="texto-peq">${plural(l.length, "pedido", "pedidos")}</p>` + tabela(
-        ["Código", "Cliente", "Canal", "Status", "Pagamento", "Total", "Entrega", "Vendido por", "Criado em"],
-        l.map((o) => [
-          `<a class="lk-forte" href="#pedidos/${enc(o.id)}">${esc(o.code)}</a>`,
-          `${esc(o.name)}<br><span class="texto-peq">${esc(fone(o.phone))}</span>`,
-          esc(CANAIS[o.channel] || o.channel),
-          tagPed(o.status),
-          tag(STATUS_PAG[o.payment_status] || o.payment_status, TOM_PAG[o.payment_status]),
-          esc(brl0(o.total_cents)),
-          esc(o.entrega || "—") + (o.tracking_code ? `<br><span class="texto-peq">${esc(o.tracking_code)}</span>` : ""),
-          esc(o.vendedor || (o.channel === "site" ? "Site" : "—")),
-          esc(dataHora(o.created_at)),
-        ]), "Pedidos");
+        ["Código", "Cliente", "Canal", "Status", "Pagamento", "Total", "Entrega", "Responsável", "Data", "Ação"],
+        l.map((o) => {
+          const recebido = o.tipo === "atendimento";
+          const href = "#" + (recebido ? "atendimento/" : "pedidos/") + enc(o.id);
+          return [
+            `<a class="lk-forte" href="${href}">${esc(o.code)}</a>`,
+            esc(o.name || "Sem nome"),
+            esc(recebido ? "WhatsApp" : CANAIS[o.channel] || o.channel),
+            recebido ? tagAt(o.status) : tagPed(o.status),
+            recebido ? "A combinar" : tagPag(o.payment_status),
+            o.total_cents == null ? "A confirmar" : esc(brl0(o.total_cents)),
+            esc(o.entrega || "—") + (o.tracking_code ? `<br><span class="texto-peq">${esc(o.tracking_code)}</span>` : ""),
+            esc(o.responsavel || "—"),
+            esc(dataHora(o.created_at)),
+            `<a class="btn btn--vazio btn--peq" href="${href}">Ver pedido</a>`,
+          ];
+        }), "Pedidos");
     });
   }
 
@@ -1273,7 +1285,7 @@
             <section class="cartao" aria-labelledby="h-itens">
               <div class="cartao-topo"><h2 id="h-itens">Peças</h2></div>
               ${tabela(["Peça", "Tam.", "Cor", "Qtd.", "Unitário", "Total"], (o.items || []).map((l) => [
-                esc(l.nome), esc(l.tam), esc(l.cor || "—"), esc(l.qtd), esc(brl(l.preco_unit)), esc(brl(l.total != null ? l.total : (l.preco_unit != null ? l.preco_unit * l.qtd : null))),
+                `<span class="peca-pedido">${fotoItem(l)}${esc(l.nome)}</span>`, esc(l.tam), esc(l.cor || "—"), esc(l.qtd), esc(brl(l.preco_unit)), esc(brl(l.total != null ? l.total : (l.preco_unit != null ? l.preco_unit * l.qtd : null))),
               ]), "Peças do pedido")}
               <dl class="totais">
                 <div><dt>Subtotal</dt><dd>${esc(brl0(o.subtotal_cents))}</dd></div>
@@ -1288,6 +1300,7 @@
               <dl class="dados dados--2">
                 <div><dt>Situação</dt><dd>${tag(STATUS_PAG[o.payment_status] || o.payment_status, TOM_PAG[o.payment_status])}</dd></div>
                 <div><dt>Forma</dt><dd>${esc(METODOS[o.payment_method] || o.payment_method || "a definir")}</dd></div>
+                <div><dt>Preferência da cliente</dt><dd>${esc(o.payment_pref || "—")}</dd></div>
                 <div><dt>Recebido</dt><dd>${esc(brl0(pago))}${!aprovado && resta ? ` · falta ${esc(brl0(resta))}` : ""}</dd></div>
                 <div><dt>Pago em</dt><dd>${esc(dataHora(o.paid_at))}</dd></div>
                 ${o.payment_provider ? `<div><dt>Plataforma</dt><dd>${esc(o.payment_provider)}${o.payment_ref ? " · " + esc(o.payment_ref) : ""}</dd></div>` : ""}

@@ -157,7 +157,7 @@ async function precificar(itensBrutos, opcoes, cliente) {
 
   const ids = Array.from(new Set(itensBrutos.map((i) => texto(i && i.id, 20))));
   const prods = await q.query(
-    "SELECT id, name, color_name, price_cents, active, weight_g, height_cm, width_cm, length_cm " +
+    "SELECT id, name, color_name, price_cents, active, images, weight_g, height_cm, width_cm, length_cm " +
     "FROM products WHERE id = ANY($1::text[])", [ids]);
   const vars = await q.query(
     "SELECT id, product_id, size, color, stock, active FROM product_variants WHERE product_id = ANY($1::text[])", [ids]);
@@ -166,25 +166,40 @@ async function precificar(itensBrutos, opcoes, cliente) {
 
   const linhas = [];
   const problemas = [];
+  const quantidades = new Map();
   for (const bruto of itensBrutos) {
     const id = texto(bruto && bruto.id, 20);
     const p = mapa[id];
     const tam = texto(bruto && bruto.tam, 6).toUpperCase();
-    const qtd = inteiro(bruto && bruto.qtd, 1, 20);
-    if (!p || !qtd) { problemas.push({ id, motivo: "peça não encontrada" }); continue; }
-    const corPedida = texto(bruto && bruto.cor, 60);
-    const v = vars.rows.find((x) => x.product_id === id && x.size === tam && (x.color === corPedida || !corPedida)) ||
-              vars.rows.find((x) => x.product_id === id && x.size === tam);
-    if (!v || !v.active || !p.active) { problemas.push({ id, tam, motivo: "tamanho indisponível" }); continue; }
+    const qtd = Number(bruto && bruto.qtd);
+    if (!p || !p.active) { problemas.push({ id, motivo: "peça indisponível" }); continue; }
+    if (!Number.isInteger(qtd) || qtd < 1 || qtd > 20) {
+      problemas.push({ id, tam, motivo: "quantidade inválida" }); continue;
+    }
+    const corPedida = texto(bruto.cor, 60);
+    const candidatas = vars.rows.filter((v) => v.product_id === id && v.size === tam && v.active);
+    const v = candidatas.find((x) => (x.color || p.color_name || "") === (corPedida || p.color_name || "")) ||
+      (!corPedida ? candidatas[0] : null);
+    if (!v) { problemas.push({ id, tam, motivo: "tamanho ou cor indisponível" }); continue; }
+    const quantidade = (quantidades.get(v.id) || 0) + qtd;
+    quantidades.set(v.id, quantidade);
     if (o.exigirPreco && p.price_cents == null) problemas.push({ id, tam, motivo: "sem valor cadastrado" });
     if (o.exigirEstoque) {
       if (v.stock == null) problemas.push({ id, tam, motivo: "estoque não confirmado" });
-      else if (v.stock < qtd) problemas.push({ id, tam, motivo: v.stock === 0 ? "esgotado" : "só " + v.stock + " em estoque" });
+      else if (v.stock < quantidade) problemas.push({ id, tam, motivo: v.stock === 0 ? "esgotado" : "só " + v.stock + " em estoque" });
+    } else if (o.validarDisponibilidade && v.stock != null && v.stock < quantidade) {
+      problemas.push({ id, tam, motivo: v.stock === 0 ? "esgotado" : "só " + v.stock + " em estoque" });
     } else if (v.stock === 0) {
       problemas.push({ id, tam, motivo: "esgotado", aviso: true });
     }
-    const unit = bruto && Number.isInteger(bruto.preco_manual) && o.permitirPrecoManual ? bruto.preco_manual : p.price_cents;
+    const manual = o.permitirPrecoManual && bruto.preco_manual != null;
+    if (manual && (!Number.isInteger(bruto.preco_manual) || bruto.preco_manual < 0)) {
+      throw erroNegocio("Valor unitário inválido.");
+    }
+    const unit = manual ? bruto.preco_manual : p.price_cents;
+    if (unit != null && unit * qtd > 2147483647) throw erroNegocio("O valor da peça ultrapassa o limite do pedido.");
     linhas.push({
+      foto: Array.isArray(p.images) ? p.images[0] || null : null,
       product_id: p.id,
       variant_id: v.id,
       nome: p.name,
@@ -205,6 +220,7 @@ async function precificar(itensBrutos, opcoes, cliente) {
   }
   const semPreco = linhas.some((l) => l.preco_unit == null);
   const subtotal = semPreco ? null : linhas.reduce((s, l) => s + l.total, 0);
+  if (subtotal > 2147483647) throw erroNegocio("O subtotal ultrapassa o limite do pedido.");
   return { linhas, subtotal, problemas, semPreco };
 }
 
@@ -315,38 +331,16 @@ function enderecoLinha(e) {
 }
 
 function mensagemPedido(sol) {
-  const linhas = sol.original_items || sol.items || [];
-  const env = sol.shipping || {};
-  const sub = linhas.some((l) => l.preco_unit == null) ? null : linhas.reduce((t, l) => t + l.preco_unit * l.qtd, 0);
-  const frete = env.preco;
-  const total = sub == null || frete == null ? null : sub + frete;
-  const p = [];
-  p.push("*PRETA CHIK — NOVO PEDIDO*");
-  p.push("");
-  p.push("Olá! Montei meu pedido pelo site da Preta Chik e gostaria de finalizar com atendimento exclusivo.");
-  p.push("");
-  p.push("*Pedido: #" + sol.code + "*");
-  p.push("");
-  p.push("*Meus produtos:*");
-  linhas.forEach((l, i) => {
-    p.push((i + 1) + ". " + l.nome);
-    p.push("Tamanho: " + l.tam);
-    if (l.cor) p.push("Cor: " + l.cor);
-    p.push("Quantidade: " + l.qtd);
-    p.push("Valor: " + (l.preco_unit == null ? "a confirmar com a loja" : reais(l.preco_unit) + (l.qtd > 1 ? " cada" : "")));
-    p.push("");
-  });
-  p.push("Entrega: " + (env.tipo === "retirada" ? "Retirada na loja" : env.nome ? "Envio — " + env.nome + (env.empresa ? " (" + env.empresa + ")" : "") : "Envio"));
-  if (env.tipo !== "retirada" && sol.address) p.push("Endereço: " + enderecoLinha(sol.address));
-  p.push("Frete: " + (env.tipo === "retirada" ? "sem frete (retirada)" : frete == null ? "a confirmar" : reais(frete) + (env.prazo ? " · prazo estimado " + env.prazo + " dias úteis" : "")));
-  p.push("Pagamento preferido: " + (sol.payment_pref || "a combinar"));
-  p.push("Subtotal: " + (sub == null ? "a confirmar" : reais(sub)));
-  p.push("Total: " + (total == null ? "a confirmar" : reais(total)));
-  p.push("Cliente: " + (sol.name || ""));
-  if (sol.customer_note) p.push("Observação: " + sol.customer_note);
-  p.push("");
-  p.push("Gostaria de confirmar a disponibilidade e finalizar meu pedido. Obrigada!");
-  return p.join("\n");
+  return "Olá! Montei meu pedido pelo site da Preta Chik e gostaria de finalizar minha compra.\n\n" +
+    "Código do pedido: " + sol.code + "\n\n" +
+    "Poderia me ajudar a concluir o atendimento?";
+}
+
+function pedidoRepetido(sol, cliente) {
+  if (sol.customer_id !== (cliente ? cliente.id : null)) {
+    throw erroNegocio("Esta tentativa pertence a outra sessão. Revise a sacola e tente novamente.", 409);
+  }
+  return { sol, repetida: true };
 }
 
 async function opcoesPagamento(cliente) {
@@ -364,14 +358,12 @@ async function criarPedidoWhatsapp(corpo, cliente) {
   const F = require("./frete"); // carregado aqui para evitar ciclo frete <-> loja
   const idem = chaveIdem(corpo && corpo.chave);
   const numero = await whatsappDaLoja();
-  if (idem) {
-    const ja = await db.um("SELECT * FROM service_requests WHERE idempotency_key = $1", [idem]);
-    if (ja) return { sol: ja, numero, mensagem: mensagemPedido(ja), repetida: true };
-  }
+  if (!idem) throw erroNegocio("Atualize a sacola antes de tentar finalizar o pedido.", 400);
+  const ja = await db.um("SELECT id, code, status, customer_id FROM service_requests WHERE idempotency_key = $1", [idem]);
+  if (ja) return Object.assign(pedidoRepetido(ja, cliente), { numero, mensagem: mensagemPedido(ja) });
 
-  const pre = await precificar(corpo && corpo.itens, {});
-  const esgotados = pre.problemas.filter((x) => x.motivo === "esgotado");
-  const bloqueio = pre.problemas.filter((x) => !x.aviso).concat(esgotados);
+  const pre = await precificar(corpo && corpo.itens, { validarDisponibilidade: true });
+  const bloqueio = pre.problemas.filter((x) => !x.aviso);
   if (bloqueio.length) throw erroNegocio("Algumas peças da sacola não estão disponíveis nesse tamanho. Revise a sacola.", 409, { problemas: bloqueio });
 
   const contato = validarContato({
@@ -409,49 +401,48 @@ async function criarPedidoWhatsapp(corpo, cliente) {
   if (!pref || opcoes.indexOf(pref) < 0) throw erroNegocio("Escolha como prefere pagar.", 400, { campo: "pagamento" });
   const nota = texto(corpo && corpo.observacao, 500) || null;
 
-  const sol = await db.transacao(async (c) => {
-    for (let t = 0; t < 5; t++) {
-      try {
-        const r = await c.query(
-          "INSERT INTO service_requests (code, customer_id, name, phone, email, cep, address, original_items, items, subtotal_cents, " +
-          "shipping, shipping_cents, payment_pref, customer_note, status, forwarded_at, idempotency_key) " +
-          "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,'aguardando_atendimento',now(),$14) RETURNING *",
-          [gerarCodigo("PC"), cliente ? cliente.id : null, contato.nome, contato.fone, contato.email,
-           endereco ? endereco.cep : null, endereco ? JSON.stringify(endereco) : null, JSON.stringify(pre.linhas), pre.subtotal,
-           JSON.stringify(shipping), shipping.preco, pref, nota, idem]);
-        await c.query("INSERT INTO service_request_events (request_id, kind, detail) VALUES ($1,'criado',$2)",
-          [r.rows[0].id, JSON.stringify({ origem: "site", encaminhado: "whatsapp", itens: pre.linhas.length, entrega: shipping.nome, pagamento: pref })]);
-        return r.rows[0];
-      } catch (e) {
-        if (e && e.code === "23505" && /code/.test(e.constraint || "")) continue;
-        throw e;
+  const resultado = await db.transacao(async (c) => {
+    for (let tentativa = 0; tentativa < 5; tentativa++) {
+      const r = await c.query(
+        "INSERT INTO service_requests (code, customer_id, name, phone, email, cep, address, original_items, items, subtotal_cents, " +
+        "shipping, shipping_cents, payment_pref, customer_note, status, forwarded_at, idempotency_key) " +
+        "SELECT $1,$2::uuid,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$8::jsonb,$9::int,$10::jsonb,$11::int,$12,$13,'aguardando_atendimento',now(),$14 " +
+        "WHERE NOT EXISTS (SELECT 1 FROM orders WHERE code = $1) " +
+        "ON CONFLICT DO NOTHING RETURNING id, code, status, customer_id",
+        [gerarCodigo("PC"), cliente ? cliente.id : null, contato.nome, contato.fone, contato.email,
+         endereco ? endereco.cep : null, endereco ? JSON.stringify(endereco) : null, JSON.stringify(pre.linhas), pre.subtotal,
+         JSON.stringify(shipping), shipping.preco, pref, nota, idem]);
+      const sol = r.rows[0];
+      if (sol) {
+        await evento(c, "service_request_events", "request_id", sol.id, "criado",
+          { origem: "site", encaminhado: "whatsapp", itens: pre.linhas.length, entrega: shipping.nome, pagamento: pref });
+        return { sol };
       }
+      // Se outra requisição salvou a mesma chave, o INSERT espera sua transação.
+      const repetida = await c.query("SELECT id, code, status, customer_id FROM service_requests WHERE idempotency_key = $1", [idem]);
+      if (repetida.rows[0]) return pedidoRepetido(repetida.rows[0], cliente);
     }
     throw new Error("não consegui gerar código único");
   });
-  return { sol, numero, mensagem: mensagemPedido(sol) };
+  return Object.assign(resultado, { numero, mensagem: mensagemPedido(resultado.sol) });
 }
 
 /* ------------------------------------------------------- inserir pedido */
 async function inserirPedido(c, dados) {
   for (let t = 0; t < 5; t++) {
-    try {
-      const r = await c.query(
+    const r = await c.query(
         "INSERT INTO orders (code, customer_id, channel, service_request_id, status, payment_status, payment_method, " +
         "name, phone, email, address, items, subtotal_cents, discount_cents, shipping_cents, total_cents, coupon_code, " +
         "shipping, sold_by, notes, stock_committed, idempotency_key) " +
-        "VALUES ($1,$2,$3,$4,'aguardando_pagamento','pendente',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *",
+        "VALUES ($1,$2,$3,$4,'aguardando_pagamento','pendente',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) ON CONFLICT (code) DO NOTHING RETURNING *",
         [t === 0 && dados.code ? dados.code : gerarCodigo("PC"), dados.customer_id || null, dados.channel, dados.service_request_id || null, dados.payment_method || null,
          dados.name, dados.phone, dados.email || null, dados.address ? JSON.stringify(dados.address) : null,
          JSON.stringify(dados.items), dados.subtotal, dados.discount || 0, dados.shipping_cents || 0, dados.total,
          dados.coupon_code || null, dados.shipping ? JSON.stringify(dados.shipping) : null, dados.sold_by || null,
          dados.notes || null, !!dados.stock_committed, dados.idempotency_key || null]);
-      if (dados.payment_pref) await c.query("UPDATE orders SET payment_pref = $1 WHERE id = $2", [dados.payment_pref, r.rows[0].id]);
-      return r.rows[0];
-    } catch (e) {
-      if (e && e.code === "23505" && /orders_code/.test(e.constraint || "")) continue;
-      throw e;
-    }
+    if (!r.rows[0]) continue;
+    if (dados.payment_pref) await c.query("UPDATE orders SET payment_pref = $1 WHERE id = $2", [dados.payment_pref, r.rows[0].id]);
+    return r.rows[0];
   }
   throw new Error("não consegui gerar código único de pedido");
 }
