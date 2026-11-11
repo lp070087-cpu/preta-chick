@@ -1,0 +1,200 @@
+/* Campanha aplicada à home e à loja. Os tokens da vitrine continuam em base.css. */
+[data-campanha="natal-2026"] {
+  --natal-fundo: #faf9f6;
+  --natal-creme: #f3efe8;
+  --natal-grafite: #252320;
+  --natal-vinho: #782f38;
+  --natal-verde: #365448;
+  --natal-dourado: #b79b68;
+  --natal-linha: #dfd4c3;
+}
+
+[data-campanha="natal-2026"] body,
+[data-campanha="natal-2026"] .cabecalho,
+[data-campanha="natal-2026"] .passarela {
+  background: var(--natal-fundo);
+}
+
+[data-campanha="natal-2026"] .cabecalho {
+  border-bottom-color: var(--natal-linha);
+}
+
+[data-campanha="natal-2026"] .cabecalho .marca__nome i {
+  color: var(--natal-vinho);
+}
+
+[data-campanha="natal-2026"] .faixa {
+  background: var(--natal-verde);
+}
+
+[data-campanha="natal-2026"] .faixa__club svg {
+  color: #e5d2ac;
+}
+
+[data-campanha="natal-2026"] .natal-texto-original {
+  display: none;
+}
+
+[data-campanha="natal-2026"] .natal-titulo {
+  display: inline;
+}
+
+[data-campanha="natal-2026"] .passarela {
+  padding-top: clamp(2rem, 4vw, 3.75rem);
+}
+
+[data-campanha="natal-2026"] .passarela__topo {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: clamp(1.4rem, 3vw, 2.5rem);
+}
+
+[data-campanha="natal-2026"] .passarela__selo::before {
+  background: var(--natal-dourado);
+}
+
+[data-campanha="natal-2026"] .passarela h1 {
+  color: var(--natal-grafite);
+  font-size: clamp(2.45rem, 5.8vw, 5.25rem);
+  line-height: 1.06;
+}
+
+[data-campanha="natal-2026"] .passarela h1 em {
+  color: var(--natal-vinho);
+}
+
+[data-campanha="natal-2026"] .natal-intro {
+  display: grid;
+  justify-items: start;
+  gap: .85rem;
+  max-width: 36ch;
+}
+
+[data-campanha="natal-2026"] .natal-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: .55rem 1.15rem;
+  border: 1px solid var(--natal-vinho);
+  background: var(--natal-vinho);
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 500;
+  transition: background-color .25s ease, color .25s ease;
+}
+
+[data-campanha="natal-2026"] .natal-link:hover {
+  background: var(--natal-fundo);
+  color: var(--natal-vinho);
+}
+
+[data-campanha="natal-2026"] .natal-link:focus-visible {
+  outline: 2px solid var(--natal-vinho);
+  outline-offset: 3px;
+}
+
+[data-campanha="natal-2026"] .passarela__palco {
+  isolation: isolate;
+  border-radius: 0;
+  outline: 1px solid var(--natal-linha);
+  outline-offset: -1px;
+  background: var(--natal-creme);
+}
+
+[data-campanha="natal-2026"] .passarela__palco:focus-visible {
+  outline: 2px solid var(--natal-vinho);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+[data-campanha="natal-2026"] .passarela__palco::before {
+  inset-inline: 1.25rem;
+  background: var(--natal-linha);
+}
+
+[data-campanha="natal-2026"] .passarela__palco::after {
+  content: "";
+  position: absolute;
+  inset: 1rem auto auto 1rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-top: 1px solid var(--natal-dourado);
+  border-left: 1px solid var(--natal-dourado);
+  pointer-events: none;
+}
+
+[data-campanha="natal-2026"] .passarela__provas {
+  border-top-color: var(--natal-linha);
+}
+
+[data-campanha="natal-2026"] .faixa-corre {
+  background: var(--natal-verde);
+}
+
+[data-campanha="natal-2026"] .faixa-corre__via span::after {
+  color: #e5d2ac;
+}
+
+[data-campanha="natal-2026"] .faixa-corre__trilho {
+  animation-duration: 62s;
+}
+
+[data-campanha="natal-2026"] .natal-vitrine {
+  background: var(--natal-creme);
+}
+
+[data-campanha="natal-2026"] .natal-mensagem {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  margin: 0 0 1.5rem;
+  color: var(--natal-verde);
+  font: italic 400 clamp(.98rem, 2vw, 1.18rem)/1.5 var(--serif);
+}
+
+[data-campanha="natal-2026"] .natal-mensagem::before {
+  content: "";
+  flex: 0 0 .42rem;
+  height: .42rem;
+  margin-inline-start: .12rem;
+  transform: rotate(45deg);
+  background: var(--natal-dourado);
+}
+
+[data-campanha="natal-2026"] .natal-mensagem::after {
+  content: "";
+  flex: 1 1 3rem;
+  height: 1px;
+  background: var(--natal-linha);
+}
+
+[data-campanha="natal-2026"] .rodape {
+  border-top: 2px solid var(--natal-dourado);
+}
+
+@media (max-width: 560px) {
+  [data-campanha="natal-2026"] .passarela__topo {
+    align-items: stretch;
+    gap: .9rem;
+  }
+
+  [data-campanha="natal-2026"] .passarela__palco {
+    height: clamp(276px, 55svh, 440px);
+  }
+
+  [data-campanha="natal-2026"] .passarela__palco::after {
+    width: 1.8rem;
+    height: 1.8rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-campanha="natal-2026"] .natal-link {
+    transition: none;
+  }
+
+  [data-campanha="natal-2026"] .faixa-corre__trilho {
+    animation: none;
+  }
+}

@@ -150,17 +150,17 @@
   }
 
   /* ------------------------------------------------------- pintar */
-  /* foto mais larga que a caixa (ex.: modelo-6 no celular) não pode passar
-     da borda direita do palco: puxa só o necessário para dentro.         */
+  /* Mantém a silhueta inteira dentro do palco, inclusive nos looks de trás. */
   function posicao(i, slot, pos) {
     var x = pos[slot];
     var W = palco.clientWidth, H = els[i].offsetHeight;
     if (!W || !H) return x;
     var l = LOOKS[i], util = ALTURA_FOTO - (l.pe || 0);
     var meia = (H * ALTURA_FOTO / util) * (l.larg / ALTURA_FOTO) * ESC[slot] / 2;
-    var limite = W - 6;
-    var direita = x / 100 * W + meia;
-    return direita > limite ? x - (direita - limite) / W * 100 : x;
+    var margem = meia + 6;
+    if (margem * 2 >= W) return 50;
+    var centro = Math.max(margem, Math.min(W - margem, x / 100 * W));
+    return centro / W * 100;
   }
 
   function pintarModelos() {

@@ -24,6 +24,8 @@
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/paginas.css">
 <link rel="stylesheet" href="assets/css/passarela.css">
+<link rel="stylesheet" href="assets/css/natal-2026.css">
+<script src="assets/js/natal-2026.js"></script>
 </head>
 <body>
 
@@ -40,10 +42,14 @@
 <section class="passarela" aria-labelledby="passarelaTitulo">
   <div class="envelope passarela__topo">
     <div>
-      <p class="passarela__selo"><span class="em">Nova coleção · Olinda/PE</span></p>
-      <h1 id="passarelaTitulo">Verão <em>Preta Chik</em></h1>
+      <p class="passarela__selo"><span class="em"><span class="natal-texto-original">Nova coleção · Olinda/PE</span><span class="natal-titulo" hidden>Edição Natal 2026</span></span></p>
+      <h1 id="passarelaTitulo"><span class="natal-texto-original">Verão <em>Preta Chik</em></span><span class="natal-titulo" hidden>Um verão para <em>celebrar.</em></span></h1>
     </div>
-    <p class="passarela__sub">Seis looks prontos para o sol. Toque em qualquer modelo da fila para trazê-la à frente e veja as peças de cada look.</p>
+    <p class="passarela__sub natal-texto-original">Seis looks prontos para o sol. Toque em qualquer modelo da fila para trazê-la à frente e veja as peças de cada look.</p>
+    <div class="natal-intro" hidden>
+      <p class="passarela__sub">Descubra os looks que vão acompanhar seus melhores momentos neste fim de ano.</p>
+      <a class="natal-link" href="loja.html">Explorar coleção</a>
+    </div>
   </div>
 
   <div class="envelope passarela__grade">
@@ -150,7 +156,7 @@
 </section>
 
 <!-- ============================ NOVIDADES ============================ -->
-<section class="secao secao--areia">
+<section class="secao secao--areia natal-vitrine">
   <div class="envelope">
     <div class="cabeca linha-topo">
       <div>
@@ -159,6 +165,7 @@
       </div>
       <a class="lk lk-seta rev" style="--atraso:120ms" href="loja.html?cat=novidades">Ver todas <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
+    <p class="natal-mensagem" hidden>Da praia aos encontros de fim de ano.</p>
     <div class="grade-produtos" id="gradeNovidades" aria-busy="true">
       <!-- skeleton: some quando o JS desenha as peças -->
       <article class="cartao cartao--esq" aria-hidden="true"><div class="cartao__midia"></div><div class="cartao__txt"><span class="cartao__cat"><span class="esq-texto" style="--l:5em">&nbsp;</span></span><div class="cartao__nome"><span class="esq-texto" style="--l:86%">&nbsp;</span></div><div class="cartao__preco"><span class="consulta"><span class="esq-texto" style="--l:6.5em">&nbsp;</span></span></div><div class="cartao__tams"><span class="esq-bloco">PP</span><span class="esq-bloco">P</span><span class="esq-bloco">M</span><span class="esq-bloco">G</span><span class="esq-bloco">GG</span></div><div class="cartao__cores"><i class="esq-bloco"></i><i class="esq-bloco"></i></div></div></article>
