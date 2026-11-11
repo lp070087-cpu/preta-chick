@@ -510,19 +510,22 @@ const LB = (function () {
     const p = buscaProduto(id);
     if (!p) return;
     const caixa = um("#rapidaCaixa");
+    const cores = coresDisponiveis(p);
+    const cor = cores.includes(p.cor) ? p.cor : cores[0] || "";
+    const selecionado = produtoDaCor(p, cor);
     caixa.innerHTML = '' +
       '<button class="icone-bt rapida__fechar" data-fecha="rapida" aria-label="Fechar">' + ICO.fechar + '</button>' +
       '<div class="rapida__foto"><div class="midia"><img src="' + fotoProduto(p, "a") + '" alt="' + escapa(p.nome) + '" width="720" height="900"></div></div>' +
       '<div class="rapida__info">' +
         '<span class="em em--rosa">' + escapa(p.cat) + '</span>' +
         '<h3 style="margin-top:.5rem">' + escapa(p.nome) + '</h3>' +
-        '<p class="texto-peq" style="margin-bottom:1rem">Cor ' + escapa(p.cor) + ' · ' + tamanhosDe(p).join(" · ") + '</p>' +
+        '<p class="texto-peq" style="margin-bottom:1rem">Cor ' + escapa(cor || "da peça") + ' · ' + tamanhosDe(selecionado).join(" · ") + '</p>' +
         '<div class="prod__preco" style="padding-block:.9rem;margin-bottom:1.1rem" data-preco-rapida="' + p.id + '">' + precoVisivel(p) +
           notaRapida(p) + '</div>' +
         '<div class="prod__grupo"><span class="rotulo">Tamanho</span><div class="tamanhos" data-tams="' + p.id + '">' +
-          botoesTamanho(p) +
+          botoesTamanho(selecionado) +
         '</div></div>' +
-        '<button class="bt bt--rosa bt--largo" type="button" data-add="' + p.id + '">Adicionar à sacola</button>' +
+        '<button class="bt bt--rosa bt--largo" type="button" data-cor-pedido="' + escapa(cor) + '" data-add="' + p.id + '">Adicionar à sacola</button>' +
         '<a class="bt bt--vazio bt--largo" href="produto.html?id=' + p.id + '" style="margin-top:.5rem">Ver página da peça</a>' +
       '</div>';
     abrir("rapida");
@@ -839,7 +842,7 @@ const LB = (function () {
         const caixaTam = um('[data-tams="' + id + '"]');
         const on = caixaTam ? um("button.on", caixaTam) : null;
         if (caixaTam && !on) { toast("Escolha um tamanho disponível"); return; }
-        adicionar(id, null, on ? on.getAttribute("data-tam") : "M", 1);
+        adicionar(id, add.getAttribute("data-cor-pedido"), on ? on.getAttribute("data-tam") : "M", 1);
       }
 
       const tam = e.target.closest("[data-tam]");

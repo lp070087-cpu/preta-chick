@@ -707,9 +707,11 @@ var CONTA_APP = (function () {
         '<span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--rosa-lavado);color:var(--rosa-escuro);font-family:var(--sans);font-size:.78rem">' + escapa(inicial) + "</span>" +
         escapa(c.nome) + "</span></b>" +
         '<small>' + escapa(c.email) + "</small></div>" +
-      '<div class="cx-cartao"><span>Cliente desde</span><b style="font-size:1.1rem">' + escapa(CONTA_UI.dataBR(c.desde)) + "</b>" +
-        '<small>' + (S.pedidos === null ? "carregando pedidos…" :
-          escapa(resumoPecas({ itens: S.pedidos.reduce(function (a, p) { return a.concat(itensDe(p)); }, []) })) + " no total") + "</small></div>" +
+      '<div class="cx-cartao"><span>Cliente desde</span><b style="font-size:1.1rem">' +
+        escapa(c.desde ? CONTA_UI.dataBR(c.desde) : "Data indisponível") + "</b>" +
+        '<small>' + (S.erroPedidos ? "Histórico indisponível no momento" : S.pedidos === null ? "Carregando histórico…" :
+          S.pedidos.length === 0 ? "Nenhum pedido registrado" :
+          S.pedidos.length + (S.pedidos.length === 1 ? " pedido registrado" : " pedidos registrados")) + "</small></div>" +
       "</div>";
 
     /* O e-mail vem do servidor e fica SOMENTE LEITURA nesta fase: trocar o

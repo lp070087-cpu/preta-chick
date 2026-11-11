@@ -215,7 +215,9 @@ async function pagamentoManual(staff, id, c) {
   return db.transacao(async (t) => {
     const o = (await t.query("SELECT * FROM orders WHERE id = $1 FOR UPDATE", [id])).rows[0];
     if (!o) throw neg("Pedido não encontrado.", 404);
-    if (o.status === "cancelado") throw neg("Pedido cancelado não recebe pagamento.");
+    if (["cancelado", "reembolsado", "concluido"].includes(o.status) || o.payment_status === "aprovado") {
+      throw neg("Este pedido já foi encerrado ou pago.", 409);
+    }
     const ins = await t.query(
       "INSERT INTO payment_transactions (order_id, provider, provider_ref, method, status, amount_cents, staff_id, note, received_at) " +
       "VALUES ($1,'manual',$2,$3,'aprovado',$4,$5,$6,COALESCE($7, now())) ON CONFLICT (provider, provider_ref) DO NOTHING RETURNING id",
@@ -260,25 +262,36 @@ function editavel(s) {
 }
 
 async function editarItensAtendimento(staff, id, c) {
-  const pre = await L.precificar(c.itens, { permitirPrecoManual: true });
   return db.transacao(async (t) => {
     const s = await travarAtendimento(t, id); editavel(s);
-    /* cupom já aplicado: recalcula o desconto sobre os itens novos (ou remove se não vale mais) */
+    if (c.atualizadoEm && new Date(c.atualizadoEm).getTime() !== new Date(s.updated_at).getTime()) {
+      throw neg("O pedido mudou enquanto você editava. Atualize os detalhes e revise as peças.", 409);
+    }
+    const pre = await L.precificar(c.itens, { permitirPrecoManual: true, validarDisponibilidade: true }, t);
+    if (pre.problemas.length) {
+      const detalhes = pre.problemas.map((x) => [x.id, x.tam, x.motivo].filter(Boolean).join(" · ")).join("; ");
+      throw neg("Revise as peças antes de salvar. " + detalhes, 409);
+    }
+    /* Recalcula o cupom e limita o desconto ao novo subtotal. */
     let desc = s.discount_cents || 0, cupom = s.coupon_code;
+    if (pre.subtotal != null) desc = Math.min(desc, pre.subtotal);
     if (cupom) {
       try { const cup = await L.aplicarCupom(cupom, pre.subtotal, s.shipping_cents, t); desc = cup.desconto; }
       catch (e) { if (!e.negocio) throw e; cupom = null; desc = 0; }
-      await t.query("UPDATE service_requests SET discount_cents = $1, coupon_code = $2 WHERE id = $3", [desc, cupom, id]);
     }
-    await t.query("UPDATE service_requests SET items = $1, subtotal_cents = $2, status = CASE WHEN status = 'aguardando_atendimento' THEN 'em_atendimento' ELSE status END, " +
-      "assigned_to = COALESCE(assigned_to, $3), updated_at = now() WHERE id = $4", [JSON.stringify(pre.linhas), pre.subtotal, staff.id, id]);
+    await t.query("UPDATE service_requests SET items = $1, subtotal_cents = $2, discount_cents = $3, coupon_code = $4, " +
+      "status = CASE WHEN status = 'aguardando_atendimento' THEN 'em_atendimento' ELSE status END, " +
+      "assigned_to = COALESCE(assigned_to, $5), updated_at = now() WHERE id = $6",
+      [JSON.stringify(pre.linhas), pre.subtotal, desc, cupom, staff.id, id]);
+    const descrever = (l) => [l.nome, l.tam, l.cor, l.qtd + " × " + L.reais(l.preco_unit)].filter(Boolean).join(" · ");
     await L.evento(t, "service_request_events", "request_id", id, "itens",
-      { antes: (s.items || []).map((l) => l.nome + " " + l.tam + " x" + l.qtd), depois: pre.linhas.map((l) => l.nome + " " + l.tam + " x" + l.qtd), subtotal: pre.subtotal }, staff.id);
+      { antes: (s.items || []).map(descrever), depois: pre.linhas.map(descrever), subtotal: pre.subtotal, desconto: desc }, staff.id);
     return pre;
   });
 }
 
 async function valoresAtendimento(staff, id, c) {
+  if (c.desconto !== undefined) exigir(staff, "financeiro");
   return db.transacao(async (t) => {
     const s = await travarAtendimento(t, id); editavel(s);
     const sub = totalAtendimento(s).subtotal;
@@ -286,7 +299,7 @@ async function valoresAtendimento(staff, id, c) {
     let cupom = s.coupon_code;
     if (c.cupom !== undefined) {
       if (c.cupom) { const cup = await L.aplicarCupom(c.cupom, sub, s.shipping_cents, t); cupom = cup.codigo; desconto = cup.desconto; if (cup.freteGratis && c.frete === undefined) { c.frete = 0; c.freteTipo = c.freteTipo || (s.shipping && s.shipping.tipo) || "manual"; c.freteDescricao = c.freteDescricao || "Frete grátis (cupom " + cup.codigo + ")"; } }
-      else cupom = null;
+      else if (cupom) { cupom = null; if (c.desconto === undefined) desconto = 0; }
     }
     if (sub != null && desconto > sub) throw neg("O desconto não pode ser maior que o subtotal.");
     let frete = s.shipping_cents, envio = s.shipping;
@@ -312,7 +325,8 @@ async function converterAtendimento(staff, id, c) {
     const endereco = tipo === "retirada" ? null : (c.endereco ? L.validarEndereco(c.endereco) : s.address || null);
     if (tipo !== "retirada" && !endereco) throw neg("Informe o endereço de entrega.", 400, { campo: "cep" });
     /* Revalida estoque controlado no momento da conversão. */
-    for (const l of s.items) {
+    const itensEmOrdem = s.items.slice().sort((a, b) => String(a.variant_id).localeCompare(String(b.variant_id)));
+    for (const l of itensEmOrdem) {
       const v = (await t.query("SELECT stock FROM product_variants WHERE id = $1 FOR UPDATE", [l.variant_id])).rows[0];
       if (v && v.stock !== null && v.stock < l.qtd) throw neg("Estoque insuficiente de " + l.nome + " (" + l.tam + "): " + v.stock + " disponível.", 409);
     }
@@ -324,7 +338,7 @@ async function converterAtendimento(staff, id, c) {
       coupon_code: s.coupon_code, shipping: s.shipping, sold_by: staff.id, notes: s.notes, stock_committed: true,
       code: s.code, payment_pref: s.payment_pref,
     });
-    await L.baixarEstoque(t, s.items, { tipo: "order", id: o.code }, staff.id);
+    await L.baixarEstoque(t, itensEmOrdem, { tipo: "order", id: o.code }, staff.id);
     if (s.coupon_code) await t.query("UPDATE coupons SET uses = uses + 1 WHERE code = $1", [s.coupon_code]);
     await t.query("UPDATE service_requests SET order_id = $1, sold_by = $2, status = 'aguardando_pagamento', updated_at = now() WHERE id = $3", [o.id, staff.id, s.id]);
     await L.evento(t, "service_request_events", "request_id", s.id, "pedido", { pedido: o.code, total: o.total_cents }, staff.id);
@@ -433,18 +447,46 @@ module.exports = async function handler(req, res) {
         const filtros = [], args = [];
         if (q.get("status")) { args.push(q.get("status")); filtros.push("o.status = $" + args.length); }
         if (q.get("canal")) { args.push(q.get("canal")); filtros.push("o.channel = $" + args.length); }
-        if (q.get("q")) { args.push("%" + T(q.get("q"), 80) + "%"); filtros.push("(o.code ILIKE $" + args.length + " OR o.name ILIKE $" + args.length + " OR o.phone ILIKE $" + args.length + ")"); }
-        const r = await db.consulta("SELECT o.id, o.code, o.channel, o.status, o.payment_status, o.name, o.phone, o.total_cents, o.created_at, o.tracking_code, o.shipping->>'nome' AS entrega, s.name AS vendedor " +
-          "FROM orders o LEFT JOIN staff s ON s.id = o.sold_by " + (filtros.length ? "WHERE " + filtros.join(" AND ") : "") + " ORDER BY o.created_at DESC LIMIT 300", args);
+        const busca = T(q.get("q"), 80).replace(/^#\s*/, "");
+        if (busca) {
+          const n = args.push(busca.toUpperCase());
+          if (/^(PC|AT)-[A-Z0-9]{6}$/i.test(busca)) {
+            filtros.push("(o.code = $" + n + " OR o.codigo_origem = $" + n + ")");
+          } else {
+            args[n - 1] = "%" + busca + "%";
+            filtros.push("(o.code ILIKE $" + n + " OR o.codigo_origem ILIKE $" + n + " OR o.name ILIKE $" + n + " OR o.phone ILIKE $" + n + ")");
+          }
+        }
+        const recebidos = E.pode(staff, "atendimento")
+          ? " UNION ALL SELECT r.id, r.code, 'atendimento', r.status, NULL, r.name, r.phone, " +
+            "CASE WHEN r.subtotal_cents IS NOT NULL AND r.shipping_cents IS NOT NULL THEN greatest(0, r.subtotal_cents - r.discount_cents) + r.shipping_cents END, " +
+            "r.created_at, NULL, r.shipping->>'nome', a.name, 'atendimento', NULL " +
+            "FROM service_requests r LEFT JOIN staff a ON a.id = r.assigned_to WHERE r.order_id IS NULL"
+          : "";
+        const r = await db.consulta(
+          "SELECT o.* FROM (SELECT o.id, o.code, o.channel, o.status, o.payment_status, o.name, o.phone, o.total_cents, o.created_at, " +
+          "o.tracking_code, o.shipping->>'nome' AS entrega, coalesce(a.name, s.name) AS responsavel, 'pedido' AS tipo, r.code AS codigo_origem " +
+          "FROM orders o LEFT JOIN staff s ON s.id = o.sold_by LEFT JOIN service_requests r ON r.id = o.service_request_id " +
+          "LEFT JOIN staff a ON a.id = r.assigned_to" + recebidos + ") o " +
+          (filtros.length ? "WHERE " + filtros.join(" AND ") + " " : "") +
+          "ORDER BY o.created_at DESC LIMIT 300", args);
         return ok({ pedidos: r.rows, status: L.STATUS_PEDIDO });
       }
-      if (m === "GET" && p[1]) return ok(await detalhePedido(p[1]));
+      if (m === "GET" && p[1] && !p[2]) return ok(await detalhePedido(p[1]));
+      if (!p[1]) return http.metodoNaoPermitido(res, ["GET"]);
+      if (!http.permitir(req, res, ["POST", "PUT"])) return;
       const c = await http.corpo(req);
       if (p[2] === "status") {
-        if (c.status === "reembolsado") exigir(staff, "financeiro");
+        if (c.status === "reembolsado") throw neg("Use a ação de reembolso para registrar a devolução do pagamento.", 409);
         await db.transacao(async (t) => {
           const o = (await t.query("SELECT * FROM orders WHERE id = $1 FOR UPDATE", [p[1]])).rows[0];
           if (!o) throw neg("Pedido não encontrado.", 404);
+          if (o.status !== c.status && ["cancelado", "reembolsado", "concluido"].includes(o.status)) {
+            throw neg("Este pedido já foi encerrado.", 409);
+          }
+          if (c.status === "cancelado" && o.payment_status === "aprovado") {
+            throw neg("Registre o reembolso para encerrar um pedido pago.", 409);
+          }
           if (["pago", "em_separacao", "enviado", "disponivel_retirada", "entregue", "concluido"].indexOf(c.status) > -1 && o.payment_status !== "aprovado") {
             throw neg("Registre ou confirme o pagamento antes de avançar o pedido.", 409);
           }
@@ -539,10 +581,12 @@ module.exports = async function handler(req, res) {
         const fone = L.digitos(d.atendimento.phone);
         return ok({ texto, whatsappUrl: fone ? "https://wa.me/" + (fone.length <= 11 ? "55" + fone : fone) + "?text=" + encodeURIComponent(texto) : null });
       }
+      if (!p[1]) return http.metodoNaoPermitido(res, ["GET"]);
+      if (!http.permitir(req, res, ["POST", "PUT"])) return;
       const c = await http.corpo(req);
       if (p[2] === "assumir") {
         await db.transacao(async (t) => {
-          const s = await travarAtendimento(t, p[1]);
+          const s = await travarAtendimento(t, p[1]); editavel(s);
           await t.query("UPDATE service_requests SET assigned_to = $1, status = CASE WHEN status = 'aguardando_atendimento' THEN 'em_atendimento' ELSE status END, updated_at = now() WHERE id = $2", [staff.id, s.id]);
           await L.evento(t, "service_request_events", "request_id", s.id, "assumido", { por: staff.name }, staff.id);
         });
@@ -556,14 +600,12 @@ module.exports = async function handler(req, res) {
         if (L.digitos(c.cep).length === 8) await db.consulta("UPDATE service_requests SET cep = $1 WHERE id = $2", [L.digitos(c.cep), s.id]);
         return ok({ cotacao: r });
       } else if (p[2] === "status") {
-        if (!L.STATUS_ATENDIMENTO[c.status]) throw neg("Status inválido.");
+        if (!["aguardando_atendimento", "em_atendimento", "aguardando_confirmacao", "cancelado"].includes(c.status)) {
+          throw neg("Confirme a venda para avançar para pagamento e entrega.", 409);
+        }
         await db.transacao(async (t) => {
           const s = await travarAtendimento(t, p[1]);
-          if (s.order_id && c.status !== "cancelado") throw neg("Com pedido gerado, o status acompanha o pedido. Altere pelo pedido.", 409);
-          if (s.order_id && c.status === "cancelado") {
-            const o = (await t.query("SELECT * FROM orders WHERE id = $1 FOR UPDATE", [s.order_id])).rows[0];
-            if (o && o.status !== "cancelado") await L.mudarStatusPedido(t, o, "cancelado", staff.id, { motivo: "atendimento cancelado" });
-          }
+          editavel(s);
           await t.query("UPDATE service_requests SET status = $1, updated_at = now() WHERE id = $2", [c.status, s.id]);
           await L.evento(t, "service_request_events", "request_id", s.id, "status", { de: s.status, para: c.status, motivo: T(c.motivo, 200) || null }, staff.id);
         });
@@ -586,10 +628,18 @@ module.exports = async function handler(req, res) {
       } else if (p[2] === "pagamento-preferido") {
         const pref = T(c.pagamento, 60);
         if (!pref) throw neg("Informe a forma de pagamento.", 400, { campo: "pagamento" });
-        await db.consulta("UPDATE service_requests SET payment_pref = $1, updated_at = now() WHERE id = $2", [pref, p[1]]);
+        await db.transacao(async (t) => {
+          const s = await travarAtendimento(t, p[1]); editavel(s);
+          await t.query("UPDATE service_requests SET payment_pref = $1, updated_at = now() WHERE id = $2", [pref, s.id]);
+          await L.evento(t, "service_request_events", "request_id", s.id, "preferencia_pagamento", { de: s.payment_pref, para: pref }, staff.id);
+        });
       } else if (p[2] === "contato") {
         const ct = L.validarContato(c);
-        await db.consulta("UPDATE service_requests SET name = $1, phone = $2, email = $3, updated_at = now() WHERE id = $4", [ct.nome, ct.fone, ct.email, p[1]]);
+        await db.transacao(async (t) => {
+          const s = await travarAtendimento(t, p[1]); editavel(s);
+          await t.query("UPDATE service_requests SET name = $1, phone = $2, email = $3, updated_at = now() WHERE id = $4", [ct.nome, ct.fone, ct.email, s.id]);
+          await L.evento(t, "service_request_events", "request_id", s.id, "contato", null, staff.id);
+        });
       } else if (p[2] === "converter") {
         const o = await converterAtendimento(staff, p[1], c);
         return ok(Object.assign(await detalheAtendimento(p[1]), { pedidoId: o.id, pedidoCodigo: o.code }));
