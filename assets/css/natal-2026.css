@@ -23,12 +23,57 @@
   color: var(--natal-vinho);
 }
 
+[data-campanha="natal-2026"] .cabecalho .marca {
+  position: relative;
+}
+
+[data-campanha="natal-2026"] .cabecalho .marca::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: -.5rem auto auto -.36rem;
+  width: 2.13rem;
+  aspect-ratio: 48 / 39;
+  background: url("../img/natal/gorro.svg") center / contain no-repeat;
+  transform: rotate(-22deg);
+  pointer-events: none;
+}
+
+[data-campanha="natal-2026"] .natal-faixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0 .45rem;
+  margin: 0;
+  padding: .38rem .8rem;
+  background: var(--natal-vinho);
+  color: var(--natal-fundo);
+  font-size: clamp(.7rem, 1.5vw, .82rem);
+  line-height: 1.45;
+  text-align: center;
+}
+
+[data-campanha="natal-2026"] .natal-faixa strong {
+  font-weight: 500;
+  color: #f3dfb8;
+}
+
+[data-campanha="natal-2026"] .natal-faixa__separador {
+  color: #e5d2ac;
+}
+
 [data-campanha="natal-2026"] .faixa {
-  background: var(--natal-verde);
+  background: var(--natal-creme);
+  color: var(--natal-verde);
 }
 
 [data-campanha="natal-2026"] .faixa__club svg {
-  color: #e5d2ac;
+  color: var(--natal-verde);
+}
+
+[data-campanha="natal-2026"] .faixa__dir a:hover {
+  color: var(--natal-vinho);
 }
 
 [data-campanha="natal-2026"] .natal-texto-original {
@@ -46,16 +91,24 @@
 [data-campanha="natal-2026"] .passarela__topo {
   align-items: center;
   justify-content: space-between;
-  margin-bottom: clamp(1.4rem, 3vw, 2.5rem);
+  margin-bottom: .45rem;
 }
 
 [data-campanha="natal-2026"] .passarela__selo::before {
   background: var(--natal-dourado);
 }
 
+[data-campanha="natal-2026"] .passarela__selo::after {
+  content: "";
+  width: .56rem;
+  aspect-ratio: 1;
+  background: var(--natal-dourado);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+
 [data-campanha="natal-2026"] .passarela h1 {
   color: var(--natal-grafite);
-  font-size: clamp(2.45rem, 5.8vw, 5.25rem);
+  font-size: clamp(2.45rem, 5.1vw, 5.1rem);
   line-height: 1.06;
 }
 
@@ -113,15 +166,29 @@
   background: var(--natal-linha);
 }
 
-[data-campanha="natal-2026"] .passarela__palco::after {
+[data-campanha="natal-2026"] .natal-guirlanda {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  margin-bottom: .1rem;
+}
+
+[data-campanha="natal-2026"] .natal-guirlanda::before,
+[data-campanha="natal-2026"] .natal-guirlanda::after {
   content: "";
-  position: absolute;
-  inset: 1rem auto auto 1rem;
-  width: 3.5rem;
-  height: 3.5rem;
-  border-top: 1px solid var(--natal-dourado);
-  border-left: 1px solid var(--natal-dourado);
-  pointer-events: none;
+  flex: 0 0 clamp(4.6rem, 13vw, 9rem);
+  height: 2.4rem;
+  background: url("../img/natal/ramo.svg") left center / 100% auto no-repeat;
+}
+
+[data-campanha="natal-2026"] .natal-guirlanda::after {
+  transform: scaleX(-1);
+}
+
+[data-campanha="natal-2026"] .natal-guirlanda span {
+  flex: 1;
+  height: 1px;
+  background: var(--natal-linha);
 }
 
 [data-campanha="natal-2026"] .passarela__provas {
@@ -170,7 +237,27 @@
 }
 
 [data-campanha="natal-2026"] .rodape {
+  position: relative;
   border-top: 2px solid var(--natal-dourado);
+}
+
+[data-campanha="natal-2026"] .rodape::before {
+  content: "";
+  position: absolute;
+  inset: .6rem 0 auto;
+  width: 6.5rem;
+  height: 1.8rem;
+  margin-inline: auto;
+  background: url("../img/natal/ramo.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+
+@media (min-width: 1040px) {
+  [data-campanha="natal-2026"] .passarela__topo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 24%);
+    gap: 1.5rem 2rem;
+  }
 }
 
 @media (max-width: 560px) {
@@ -183,9 +270,18 @@
     height: clamp(276px, 55svh, 440px);
   }
 
-  [data-campanha="natal-2026"] .passarela__palco::after {
-    width: 1.8rem;
-    height: 1.8rem;
+  [data-campanha="natal-2026"] .cabecalho__dentro {
+    gap: .45rem;
+  }
+
+  [data-campanha="natal-2026"] .cabecalho .marca {
+    gap: .5rem;
+    white-space: nowrap;
+  }
+
+  [data-campanha="natal-2026"] .cabecalho .marca::after {
+    inset: -.46rem auto auto -.3rem;
+    width: 1.85rem;
   }
 }
 
